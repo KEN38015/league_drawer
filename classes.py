@@ -81,38 +81,41 @@ class Table:
 			if "y" in choice:
 				return import_matchups()
 
-			codes = {list(map(lambda x: x.code, self.teams))}
+			codes = list(map(lambda x: x.code, self.teams))
 			
 			n = len(self.teams)
 			
-			team_matches = (n-1)*(2)
-			home_available = [team_matches] * n
-			away_available = [team_matches] * n
-			total = n*team_matches
+			opponents = (n-1)
+			home_available = [opponents] * n
+			away_available = [opponents] * n
+			total = n*opponents
 			for i in range(total):
 				print(f"{i}/{total} matches completed")
-				sleep(.3)
+				# sleep(.1)
 				print(f"teams available for home: {" ".join([codes[ind] for ind in range(n) if home_available[ind]])}")
-				while (home := input("home team? (3-digit code)\n")) not in codes:
+				while (home := input("home team? (3-digit code)\n").upper()) not in codes:
 					if home_available[codes.index(home)]:
 						break
-					sleep(.3)
+					# sleep(.3)
 				home_index = codes.index(home)
 				home_available[codes.index(home)] -= 1
-				sleep(.5)
+				# sleep(.2)
 				
-
-				print(f"teams available for away: {" ".join([codes[ind] for ind in range(n) if away_available[ind]].remove(home))}")
-				while (away := input("home team? (3-digit code)\n")) not in codes:
+				# remaining = [codes[ind] for ind in range(n) if away_available[ind]]
+				# remaining.remove(home)
+				print(f"teams available for away: {" ".join([codes[ind] for ind in range(n) if away_available[ind] and codes[ind] != home])}")
+				while (away := input("away team? (3-digit code)\n").upper()) not in codes:
 					if away_available[codes.index(away)]:
 						break
-					sleep(.3)
+					# sleep(.3)
 				away_index = codes.index(away)
 				away_available[codes.index(away)] -= 1
 
 				pairings.append([self.teams[home_index], self.teams[away_index]])
-
-			return
+				# sleep(.2)
+				input("success - continue?\n")
+				print("\n\n\n")
+			return pairings
 
 
 
@@ -124,7 +127,9 @@ class Table:
 			pass
 		sleep(.3)
 		matchups = self.create_matchups("auto" in choice)
-		print(*matchups, sep="\n")
+		for ind, match in enumerate(matchups):
+			print(ind+1, end=". ")
+			print(*match, sep=" vs. ")
 
 	def sort_table(self) -> None:
 		if not self.started:
