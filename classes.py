@@ -1,4 +1,5 @@
 from time import sleep
+from pathlib import Path
 import random
 
 
@@ -58,8 +59,80 @@ class Table:
 	def remove_matchup(self, to_remove : Tuple(Team)) -> None:
 		self.matchups.remove(to_remove)
 
-	def import_matchups(self) -> list:
-		pass
+
+
+	def load_preset(self) -> list:
+		print("Searching...")
+		preset_folder = Path("data/table_presets")
+
+		# scan for presets
+		available_presets = [folder for folder in preset_folder.iterdir() 
+					if folder.is_dir() and folder.suffix == ".preset"]
+		print(f"Found {len(available_presets)} preset{"s" if len(available_presets) - 1 else ""}!")
+		sleep(.5)
+		print("Select preset:")
+		sleep(.2)
+		for ind, preset in enumerate(available_presets):
+			preset = preset.with_suffix("")
+			print(f"{ind+1} - {preset.name.replace("-", "/")}")
+			sleep(.4)
+		def ask() -> int:
+			choice = input("\n")
+			return (int(choice) if 1 <= int(choice) <= len(available_presets) else ask()) if choice.isdigit() else ask()
+		choice = ask()
+		chosen_preset = available_presets[int(choice) - 1]
+		print(f"Loading {available_presets[int(choice) - 1].with_suffix("")} preset...")
+		sleep(1)
+		
+		parent = Path("data/table_presets/Premier League 26-27.preset")
+		league_data = (parent / "league_data.hex").read_text()
+		matchups = (parent / "matchups.hex").read_text()
+		
+		key = Security()
+		key.set_code(league_data)
+		league_data = key.dehex().split("\n")
+		key.set_code(matchups)
+		matchups = key.dehex().split("\n")
+		self = Table(league_data.pop(0))
+		for data in league_data:
+			self.add_team(Team(*data.split(",")))
+		codes = list(map(lambda x: x.code, self.teams))
+		for matchup in matchups:
+			list(map(lambda team: self.teams[codes.index(team)], matchup.split(", ")))
+
+		sleep(1)
+
+		print("Complete!")
+		sleep(.5)
+		print(self)
+
+
+
+		
+
+		
+		
+
+
+
+
+
+	def load_made(self) -> list:
+		print("Searching...")
+		save_folder = Path("data/made_presets")
+		# HALT
+
+	def import_preset(self) -> list:
+		while (ask := input("preset or cancel?\n")) not in {"preset", "created", "cancel"}:
+			sleep(.3)
+		sleep(.5)
+		match ask:
+			case "preset":
+				return self.load_preset()
+			case "created":
+				return self.load_made()
+			case "cancel":
+				return None
 
 
 	def create_matchups(self, auto : bool) -> list:
@@ -75,12 +148,6 @@ class Table:
 			n = len(pairings)
 			return random.sample(pairings, n) + list(map(lambda pair: pair[::-1], random.sample(pairings, n)))
 		else:
-			while (choice := input("import?\n").lower()) not in ["y", "n", "yes", "no"]:
-				pass
-			sleep(.3)
-			if "y" in choice:
-				return import_matchups()
-
 			codes = list(map(lambda x: x.code, self.teams))
 			
 			n = len(self.teams)
@@ -91,29 +158,27 @@ class Table:
 			total = n*opponents
 			for i in range(total):
 				print(f"{i}/{total} matches completed")
-				# sleep(.1)
+				sleep(.1)
 				print(f"teams available for home: {" ".join([codes[ind] for ind in range(n) if home_available[ind]])}")
 				while (home := input("home team? (3-digit code)\n").upper()) not in codes:
 					if home_available[codes.index(home)]:
 						break
-					# sleep(.3)
+					sleep(.3)
 				home_index = codes.index(home)
 				home_available[codes.index(home)] -= 1
-				# sleep(.2)
+				sleep(.2)
 				
-				# remaining = [codes[ind] for ind in range(n) if away_available[ind]]
-				# remaining.remove(home)
 				print(f"teams available for away: {" ".join([codes[ind] for ind in range(n) if away_available[ind] and codes[ind] != home])}")
 				while (away := input("away team? (3-digit code)\n").upper()) not in codes:
 					if away_available[codes.index(away)]:
 						break
-					# sleep(.3)
+					sleep(.3)
 				away_index = codes.index(away)
 				away_available[codes.index(away)] -= 1
 
 				pairings.append([self.teams[home_index], self.teams[away_index]])
-				# sleep(.2)
-				input("success - continue?\n")
+				sleep(.2)
+				input(f"{home} vs {away} add success - continue?\n")
 				print("\n\n\n")
 			return pairings
 
@@ -127,9 +192,9 @@ class Table:
 			pass
 		sleep(.3)
 		matchups = self.create_matchups("auto" in choice)
-		for ind, match in enumerate(matchups):
-			print(ind+1, end=". ")
-			print(*match, sep=" vs. ")
+		# for ind, match in enumerate(matchups):
+		# 	print(ind+1, end=". ")
+		# 	print(*match, sep=" vs. ")
 
 	def sort_table(self) -> None:
 		if not self.started:
@@ -147,7 +212,6 @@ class Table:
 
 		team1.add_scoreline(res1, res2, home=True)
 		team2.add_scoreline(res2, res1, home=False)
-			# /unfinished	!!!/
 
 
 
@@ -297,3 +361,28 @@ class Team:
 
 
 
+
+
+class Security:
+	def __init__(self):
+		self.code = ""
+
+	def set_code(self, code : str) -> None:
+		self.code = code
+
+	def get_code(self) -> str:
+		return self.code
+
+	def enhex(self) -> str:
+		return "\n".join(["{:04x}".format(ord(char)) for char in self.code])
+
+	def dehex(self) -> str:
+		return "".join([chr(int(num, 16)) for num in self.code.split("\n")])
+
+
+
+# key = Security()
+# f = Path("data/table_presets/Premier League 26-27.preset/matchups.hex")
+# key.set_code(f.read_text())
+# f.write_text(key.enhex())
+# print(key.dehex())
