@@ -101,7 +101,7 @@ class Table:
 		
 		for data in league_data:
 			self.add_team(Team(*data.split(",")))
-		codes = list(map(lambda x: x.code, self.teams))
+		codes = list(map(Team.get_code, self.teams))
 		for matchup in matchups:
 			list(map(lambda team: self.teams[codes.index(team)], matchup.split(", ")))
 
@@ -127,15 +127,60 @@ class Table:
 		save_folder = Path("data/made_presets")
 		# HALT
 
+	def team_config(self) -> None:
+		while (change := input("add/remove teams or no?\n")) not in ["add", "remove", "no"]:
+		    pass
+		if change == "add":
+			while (name := input("Name?\n").capitalize()) in list(map(Team.get_name, self.get_teams())):
+				print("Already registered!")
+				sleep(.2)
+			sleep(.2)
+
+			while (abbr := input("The name that shows up on the table?\n").capitalize()) in list(map(Team.get_abbr, self.get_teams())):
+				print("Already registered!")
+				sleep(.2)
+			sleep(.2)
+			print(f"Teams: ", end="")
+			print(*list(map(Team.get_code, self.get_teams())), sep=", ")
+			while not (code := input("3-digit code?\n").upper()).isalpha() or len(code) != 3 or code in list(map(Team.get_code, self.get_teams())):
+				pass
+			sleep(.2)
+			self.add_team(Team(name, abbr, code))
+			print("Successfully appended team!")
+			sleep(.5)
+		elif change == "remove":
+			if not self.get_teams():
+				print("There are no teams yet!")
+				sleep(.3)
+			else:
+				codes = list(map(lambda x: x.code, self.get_teams()))
+				print(f"Teams: ", end="")
+				print(*codes, sep=", ")
+				while (name := input("3-digit code of team to remove:    ").upper()) not in codes:
+					print("not in list!")
+					sleep(.3)
+			self.remove_team(self.get_teams()[codes.index(name)])
+		else:
+			if len(self.get_teams()) % 2:
+				print("Number of teams cannot be odd!")
+				sleep(.3)
+				self.team_config()
+			return
+
+		sleep(.5)
+		print("Teams:", end="")
+		print(*list(map(Team.get_abbr, self.get_teams())))
+		self.team_config()
+
 	def import_preset(self) -> None:
-		while (ask := input("preset or cancel?\n")) not in {"preset", "created", "cancel"}:
+		while (ask := input("preset or custom?\n")) not in {"preset", "custom"}:
 			sleep(.3)
 		sleep(.5)
 		match ask:
 			case "preset":
 				self.load_preset()
-			case "created":
-				self.load_made()
+			case "custom":
+				self.team_config()
 			case "cancel":
 				return
 
@@ -319,6 +364,14 @@ class Team:
 		self.home_goals : int = 0 ; self.away_goals : int = 0
 		self.goals_scored : int = 0 ; self.goals_conceded : int = 0 ; self.goal_difference : int = 0
 
+	def get_name(self) -> str:
+		return self.name
+
+	def get_abbr(self) -> str:
+		return self.abbr
+
+	def get_code(self) -> str:
+		return self.code
 	# resets dependencies
 	def recalibrate(self) -> None:
 		self.points = 3 * self.wins + self.draws
