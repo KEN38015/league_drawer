@@ -32,12 +32,16 @@ class Table:
 	]
 
 	def __init__(self, 
-				title : str,) -> None:
+				title : str = "LEAGUE",) -> None:
 		self.title : str = title
 		self.teams : List[Team] = []
 		self.matchups = []
 		self.started : bool = False
 		self.sort_table()
+
+	def get_teams(self) -> list:
+		return self.teams
+
 
 	def add_team(self, team : Team) -> None:
 		if len(self.teams) >= 99:
@@ -61,7 +65,7 @@ class Table:
 
 
 
-	def load_preset(self) -> list:
+	def load_preset(self) -> None:
 		print("Searching...")
 		preset_folder = Path("data/table_presets")
 
@@ -94,6 +98,7 @@ class Table:
 		key.set_code(matchups)
 		matchups = key.dehex().split("\n")
 		self = Table(league_data.pop(0))
+		
 		for data in league_data:
 			self.add_team(Team(*data.split(",")))
 		codes = list(map(lambda x: x.code, self.teams))
@@ -122,17 +127,17 @@ class Table:
 		save_folder = Path("data/made_presets")
 		# HALT
 
-	def import_preset(self) -> list:
+	def import_preset(self) -> None:
 		while (ask := input("preset or cancel?\n")) not in {"preset", "created", "cancel"}:
 			sleep(.3)
 		sleep(.5)
 		match ask:
 			case "preset":
-				return self.load_preset()
+				self.load_preset()
 			case "created":
-				return self.load_made()
+				self.load_made()
 			case "cancel":
-				return None
+				return
 
 
 	def create_matchups(self, auto : bool) -> list:
@@ -188,13 +193,15 @@ class Table:
 
 	def start_season(self) -> None:
 		self.started = True
+		if self.matchups:
+			return
+		
 		while (choice := input("Manual or Automatic (does not account stadium) match creation?\n").lower()) not in {"manual", "automatic", "auto"}:
 			pass
 		sleep(.3)
 		matchups = self.create_matchups("auto" in choice)
-		# for ind, match in enumerate(matchups):
-		# 	print(ind+1, end=". ")
-		# 	print(*match, sep=" vs. ")
+		print("Match creation complete!")
+		sleep(.3)
 
 	def sort_table(self) -> None:
 		if not self.started:
@@ -218,6 +225,7 @@ class Table:
 	def __str__(self) -> str:
 
 		self.sort_table()
+		print(self.teams)
 		total_width : int = sum(
 						[
 						5, # rank column
