@@ -131,18 +131,18 @@ class Table:
 		while (change := input("add/remove teams or no?\n")) not in ["add", "remove", "no"]:
 		    pass
 		if change == "add":
-			while (name := input("Name?\n").capitalize()) in list(map(Team.get_name, self.get_teams())):
+			while (name := input("Name?\n").capitalize().strip()) in list(map(Team.get_name, self.get_teams())):
 				print("Already registered!")
 				sleep(.2)
 			sleep(.2)
 
-			while (abbr := input("The name that shows up on the table?\n").capitalize()) in list(map(Team.get_abbr, self.get_teams())):
+			while (abbr := input("The name that shows up on the table?\n").capitalize().strip()) in list(map(Team.get_abbr, self.get_teams())):
 				print("Already registered!")
 				sleep(.2)
 			sleep(.2)
 			print(f"Teams: ", end="")
 			print(*list(map(Team.get_code, self.get_teams())), sep=", ")
-			while not (code := input("3-digit code?\n").upper()).isalpha() or len(code) != 3 or code in list(map(Team.get_code, self.get_teams())):
+			while not (code := input("3-digit code?\n").upper().strip()).isalpha() or len(code) != 3 or code in list(map(Team.get_code, self.get_teams())):
 				pass
 			sleep(.2)
 			self.add_team(Team(name, abbr, code))
@@ -161,28 +161,23 @@ class Table:
 					sleep(.3)
 			self.remove_team(self.get_teams()[codes.index(name)])
 		else:
+			if not self.get_teams():
+				print("There are no teams!")
+				sleep(.3)
+				self.team_config()
+
 			if len(self.get_teams()) % 2:
 				print("Number of teams cannot be odd!")
 				sleep(.3)
 				self.team_config()
+
 			return
 
 		sleep(.5)
-		print("Teams:", end="")
+		print("Teams: ", end="")
 		print(*list(map(Team.get_abbr, self.get_teams())))
 		self.team_config()
 
-	def import_preset(self) -> None:
-		while (ask := input("preset or custom?\n")) not in {"preset", "custom"}:
-			sleep(.3)
-		sleep(.5)
-		match ask:
-			case "preset":
-				self.load_preset()
-			case "custom":
-				self.team_config()
-			case "cancel":
-				return
 
 
 	def create_matchups(self, auto : bool) -> list:
@@ -210,7 +205,7 @@ class Table:
 				print(f"{i}/{total} matches completed")
 				sleep(.1)
 				print(f"teams available for home: {" ".join([codes[ind] for ind in range(n) if home_available[ind]])}")
-				while (home := input("home team? (3-digit code)\n").upper()) not in codes:
+				while (home := input("home team? (3-digit code)\n").upper().strip()) not in codes:
 					if home_available[codes.index(home)]:
 						break
 					sleep(.3)
@@ -219,7 +214,7 @@ class Table:
 				sleep(.2)
 				
 				print(f"teams available for away: {" ".join([codes[ind] for ind in range(n) if away_available[ind] and codes[ind] != home])}")
-				while (away := input("away team? (3-digit code)\n").upper()) not in codes:
+				while (away := input("away team? (3-digit code)\n").upper().strip()) not in codes:
 					if away_available[codes.index(away)]:
 						break
 					sleep(.3)
@@ -233,6 +228,41 @@ class Table:
 			return pairings
 
 
+	def instantiate(self) -> None:
+		while (ask := input("preset or custom team creation?\n").lower().strip()) not in {"preset", "custom", "load_prev"}:
+			sleep(.3)
+		sleep(.5)
+		match ask:
+			case "preset":
+				self.load_preset()
+
+			case "custom":
+				self.team_config()
+				while (choice := input("Manual or Automatic (does not account stadium) match creation?\n").lower().strip()) not in {"manual", "automatic", "auto"}:
+					pass
+					sleep(.3)
+					matchups = self.create_matchups("auto" in choice)
+					print("Match creation complete!")
+					sleep(.4)
+
+			case "load_prev":
+				pass
+
+			case "cancel":
+				return
+
+		while ["y", "n"] not in (ask := input("show matchups?\n").strip().lower()):
+			pass
+
+		if ask == "y":
+			for ind, matchup in enumerate(self.matchups):
+				print(f"{ind}. ", end="")
+				print(*matchups, sep=" vs. ")
+				sleep(.2)
+		
+
+		
+
 
 
 
@@ -240,13 +270,9 @@ class Table:
 		self.started = True
 		if self.matchups:
 			return
-		
-		while (choice := input("Manual or Automatic (does not account stadium) match creation?\n").lower()) not in {"manual", "automatic", "auto"}:
-			pass
 		sleep(.3)
-		matchups = self.create_matchups("auto" in choice)
-		print("Match creation complete!")
-		sleep(.3)
+		print("START SEASON!!!")
+		sleep(1)
 
 	def sort_table(self) -> None:
 		if not self.started:
@@ -270,7 +296,6 @@ class Table:
 	def __str__(self) -> str:
 
 		self.sort_table()
-		print(self.teams)
 		total_width : int = sum(
 						[
 						5, # rank column
