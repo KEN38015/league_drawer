@@ -22,7 +22,7 @@
 	5. enjoy using the program!
 
 
-# Licesnse
+## Licesnse
 The license of this program is the Creative Commons Zero (CC0)
 
 ## Project Status

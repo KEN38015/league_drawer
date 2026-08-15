@@ -1,6 +1,8 @@
+import threading
 from time import sleep
 from pathlib import Path
 import random
+
 
 
 
@@ -31,13 +33,30 @@ class Table:
 		
 	]
 
+	skipped = True
+
+	def recieve_inp(self) -> None:
+		input()
+		self.skipped = False
+
+	def await_inp(self) -> None:
+		threading.Thread(target=self.recieve_inp, daemon=True).start()
+
 	def __init__(self, 
 				title : str = "LEAGUE",) -> None:
 		self.title : str = title
 		self.teams : List[Team] = []
-		self.matchups = []
+		self.ties : List[Team] = []
+		self.matchups : List[List[Team]]= []
 		self.started : bool = False
+		self.ended : bool = False
 		self.sort_table()
+
+	def copy(self) -> tuple:
+		return self.title, self.teams, self.ties, self.matchups, self.started, self.ended
+
+	def paste(self, data : tuple) -> None:
+		self.title, self.teams, self.ties, self.matchups, self.started, self.ended = data
 
 	def get_teams(self) -> list:
 		return self.teams
@@ -53,6 +72,7 @@ class Table:
 	def remove_team(self, team : Team) -> bool:
 		if self.started:
 			return True
+
 		self.teams.remove(team)
 		return False
 
@@ -97,19 +117,18 @@ class Table:
 		league_data = key.dehex().split("\n")
 		key.set_code(matchups)
 		matchups = key.dehex().split("\n")
-		self = Table(league_data.pop(0))
-		
+		new = Table(league_data.pop(0))
 		for data in league_data:
-			self.add_team(Team(*data.split(",")))
-		codes = list(map(Team.get_code, self.teams))
+			new.add_team(Team(*data.split(",")))
+		codes = list(map(Team.get_code, new.teams))
 		for matchup in matchups:
-			list(map(lambda team: self.teams[codes.index(team)], matchup.split(", ")))
-
+			new.add_matchup(list(map(lambda team: new.teams[codes.index(team)], matchup.split(", "))))
 		sleep(1)
 
 		print("Complete!")
 		sleep(.5)
-		print(self)
+
+		self.paste(new.copy())
 
 
 
@@ -117,8 +136,6 @@ class Table:
 
 		
 		
-
-
 
 
 
@@ -131,12 +148,12 @@ class Table:
 		while (change := input("add/remove teams or no?\n")) not in ["add", "remove", "no"]:
 		    pass
 		if change == "add":
-			while (name := input("Name?\n").capitalize().strip()) in list(map(Team.get_name, self.get_teams())):
+			while (name := input("Name?\n").strip()) in list(map(Team.get_name, self.get_teams())):
 				print("Already registered!")
 				sleep(.2)
 			sleep(.2)
 
-			while (abbr := input("The name that shows up on the table?\n").capitalize().strip()) in list(map(Team.get_abbr, self.get_teams())):
+			while (abbr := input("The name that shows up on the table?\n").strip()) in list(map(Team.get_abbr, self.get_teams())):
 				print("Already registered!")
 				sleep(.2)
 			sleep(.2)
@@ -175,8 +192,9 @@ class Table:
 
 		sleep(.5)
 		print("Teams: ", end="")
-		print(*list(map(Team.get_abbr, self.get_teams())))
+		print(*list(map(Team.get_abbr, self.get_teams())), sep=", ")
 		self.team_config()
+
 
 
 
@@ -241,25 +259,45 @@ class Table:
 				while (choice := input("Manual or Automatic (does not account stadium) match creation?\n").lower().strip()) not in {"manual", "automatic", "auto"}:
 					pass
 					sleep(.3)
-					matchups = self.create_matchups("auto" in choice)
+					self.matchups = self.create_matchups("auto" in choice)
 					print("Match creation complete!")
 					sleep(.4)
 
-			case "load_prev":
+			case "load prev":
 				pass
 
 			case "cancel":
 				return
 
-		while ["y", "n"] not in (ask := input("show matchups?\n").strip().lower()):
+		while (ask := input("show matchups?\n").strip().lower()) not in {"y", "n", "yes", "no"}:
 			pass
 
-		if ask == "y":
-			for ind, matchup in enumerate(self.matchups):
-				print(f"{ind}. ", end="")
-				print(*matchups, sep=" vs. ")
+		if "y" in ask:
+			
+			while "code" not in (ask := input("print in team name or team code?\n").strip().lower()):
+				if "name" in ask:
+					break
 				sleep(.2)
-		
+
+			while not (ask := input("miliseconds of delay for each display?\n").strip()).isdigit():
+				print("whole number!")
+				sleep(.3)
+			sleep(.3)
+			print("(enter to skip)")
+			sleep(.5)
+
+			
+			self.await_inp()
+			for ind, matchup in enumerate(self.matchups):
+				matchup = list(map(Team.get_name if ask == "name" else Team.get_code, matchup))
+				print(f"{ind+1} - ", end="")
+				print(*matchup, sep=" vs ")
+				if self.skipped:
+					sleep(int(ask) / 1000)
+
+
+
+
 
 		
 
@@ -274,10 +312,15 @@ class Table:
 		print("START SEASON!!!")
 		sleep(1)
 
+	def end_season(self) -> None:
+		pass
+
 	def sort_table(self) -> None:
 		if not self.started:
 			self.teams.sort(key=lambda t: (-t.points, -t.goal_difference, -t.away_goals))
 		self.teams.sort(key=lambda t: t.abbr)
+		self.ties = [self.teams[i] for i in range(len(self.teams) - 1) if self.teams[i].get_tiebreaker_values() == self.teams[i + 1].get_tiebreaker_values()]
+
 
 
 	
@@ -380,9 +423,9 @@ class Team:
 				abbreviation : str,
 				code : str,
 				):
-		self.name : str = name
-		self.abbr : str = abbreviation.capitalize()
-		self.code : str = code
+		self.name : str = name.strip()
+		self.abbr : str = "".join(map(str.capitalize, abbreviation.split())).strip()
+		self.code : str = code.strip()
 		self.points : int = 0
 		self.wins : int = 0 ; self.draws : int = 0 ; self.losses : int = 0
 		self.matches_played : int = 0
@@ -437,6 +480,13 @@ class Team:
 		"goals conceded" : self.goals_conceded,
 		"goal difference" :self.goal_difference,
 		}
+
+	def get_tiebreaker_values(self) -> list:
+		return [
+			self.points,
+			self.goal_difference,
+			self.goals_scored
+		]
 
 	def __eq__(self, other) -> bool:
 		return self.name == other.name
