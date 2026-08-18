@@ -50,6 +50,12 @@ class Table:
 		self.matchups : List[List[Team]]= []
 		self.started : bool = False
 		self.ended : bool = False
+
+		self.matchup_no : int = -1
+		self.results : dict # = {(matchup) : (scoreline resprectively)}
+
+
+
 		self.sort_table()
 
 	def copy(self) -> tuple:
@@ -57,6 +63,12 @@ class Table:
 
 	def paste(self, data : tuple) -> None:
 		self.title, self.teams, self.ties, self.matchups, self.started, self.ended = data
+
+
+
+
+
+
 
 	def get_teams(self) -> list:
 		return self.teams
@@ -88,7 +100,7 @@ class Table:
 	def load_preset(self) -> None:
 		print("Searching...")
 		preset_folder = Path("data/table_presets")
-
+		sleep(.5)
 		# scan for presets
 		available_presets = [folder for folder in preset_folder.iterdir() 
 					if folder.is_dir() and folder.suffix == ".preset"]
@@ -131,7 +143,6 @@ class Table:
 		self.paste(new.copy())
 
 
-
 		
 
 		
@@ -139,10 +150,54 @@ class Table:
 
 
 
-	def load_made(self) -> list:
+	def load_prev(self) -> None:
 		print("Searching...")
-		save_folder = Path("data/made_presets")
-		# HALT
+		save_folder = Path("data/in_use")
+
+		# scan for presets
+		available_leagues = [folder for folder in preset_folder.iterdir() 
+					if folder.is_dir() and folder.suffix == ".league"]
+		sleep(.4)
+		print(f"Found {len(available_leagues)} league{"s" if len(available_leagues) - 1 else ""} in use!")
+		sleep(.5)
+		print("Select preset:")
+		sleep(.2)
+		for ind, league in enumerate(available_leagues):
+			league = league.with_suffix("available_leagues")
+			print(f"{ind+1} - {league.name.replace("-", "/")}")
+			sleep(.4)
+		def ask() -> int:
+			choice = input("\n")
+			return (int(choice) if 1 <= int(choice) <= len(available_leagues) else ask()) if choice.isdigit() else ask()
+		choice = ask()
+		chosen_preset = available_leagues[int(choice) - 1]
+		print(f"Loading {available_leagues[int(choice) - 1].with_suffix("")} preset...")
+		sleep(1)
+		
+		parent = Path("data/table_presets/Premier League 26-27.preset")
+		league_data = (parent / "league_data.hex").read_text()
+		matchups = (parent / "matchups.hex").read_text()
+		
+		key = Security()
+		key.set_code(league_data)
+		league_data = key.dehex().split("\n")
+		key.set_code(matchups)
+		matchups = key.dehex().split("\n")
+		new = Table(league_data.pop(0))
+		
+		for data in league_data:
+			new.add_team(Team(*data.split(",")))
+		codes = list(map(Team.get_code, new.teams))
+		for matchup in matchups:
+			new.add_matchup(list(map(lambda team: new.teams[codes.index(team)], matchup.split(", "))))
+		sleep(1)
+
+		print("Complete!")
+		sleep(.5)
+
+		self.paste(new.copy())
+
+
 
 	def team_config(self) -> None:
 		while (change := input("add/remove teams or no?\n")) not in ["add", "remove", "no"]:
@@ -196,8 +251,6 @@ class Table:
 		self.team_config()
 
 
-
-
 	def create_matchups(self, auto : bool) -> list:
 		pairings = []
 		remaining = self.teams[:]
@@ -247,7 +300,7 @@ class Table:
 
 
 	def instantiate(self) -> None:
-		while (ask := input("preset or custom team creation?\n").lower().strip()) not in {"preset", "custom", "load_prev"}:
+		while (ask := input("preset, custom or load prev team creation?\n").lower().strip()) not in {"preset", "custom", "load"}:
 			sleep(.3)
 		sleep(.5)
 		match ask:
@@ -263,8 +316,8 @@ class Table:
 					print("Match creation complete!")
 					sleep(.4)
 
-			case "load prev":
-				pass
+			case "load":
+				self.load_prev()
 
 			case "cancel":
 				return
@@ -298,12 +351,6 @@ class Table:
 
 
 
-
-		
-
-
-
-
 	def start_season(self) -> None:
 		self.started = True
 		if self.matchups:
@@ -321,9 +368,6 @@ class Table:
 		self.teams.sort(key=lambda t: t.abbr)
 		self.ties = [self.teams[i] for i in range(len(self.teams) - 1) if self.teams[i].get_tiebreaker_values() == self.teams[i + 1].get_tiebreaker_values()]
 
-
-
-	
 
 	
 	# home then away
@@ -494,6 +538,18 @@ class Team:
 
 	def __str__(self) -> str:
 		return self.name
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
