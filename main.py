@@ -16,7 +16,8 @@ def main() -> None:
 	league.instantiate()
 	sleep(.5)
 	league.start_season()
-	
+
+	league.export()
 	
 
 

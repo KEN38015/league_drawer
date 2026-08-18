@@ -52,7 +52,7 @@ class Table:
 		self.ended : bool = False
 
 		self.matchup_no : int = -1
-		self.results : dict # = {(matchup) : (scoreline resprectively)}
+		self.results : dict = {} # = {(matchup) : (scoreline resprectively)}
 
 
 
@@ -166,6 +166,7 @@ class Table:
 			league = league.with_suffix("available_leagues")
 			print(f"{ind+1} - {league.name.replace("-", "/")}")
 			sleep(.4)
+
 		def ask() -> int:
 			choice = input("\n")
 			return (int(choice) if 1 <= int(choice) <= len(available_leagues) else ask()) if choice.isdigit() else ask()
@@ -177,6 +178,7 @@ class Table:
 		parent = Path("data/table_presets/Premier League 26-27.preset")
 		league_data = (parent / "league_data.hex").read_text()
 		matchups = (parent / "matchups.hex").read_text()
+		team_data = (parent / "team_data.hex").read_text()
 		
 		key = Security()
 		key.set_code(league_data)
@@ -190,6 +192,7 @@ class Table:
 		codes = list(map(Team.get_code, new.teams))
 		for matchup in matchups:
 			new.add_matchup(list(map(lambda team: new.teams[codes.index(team)], matchup.split(", "))))
+
 		sleep(1)
 
 		print("Complete!")
@@ -254,6 +257,15 @@ class Table:
 	def create_matchups(self, auto : bool) -> list:
 		pairings = []
 		remaining = self.teams[:]
+
+		opponents = (n-1)
+		home_available = [opponents] * n
+		away_available = [opponents] * n
+		total = n*opponents
+
+		for team in self.get_teams():
+			team.max_matches = opponents * n
+
 		if auto:
 			for home in self.teams[::-1]:
 				for away in remaining:
@@ -268,10 +280,6 @@ class Table:
 			
 			n = len(self.teams)
 			
-			opponents = (n-1)
-			home_available = [opponents] * n
-			away_available = [opponents] * n
-			total = n*opponents
 			for i in range(total):
 				print(f"{i}/{total} matches completed")
 				sleep(.1)
@@ -353,6 +361,7 @@ class Table:
 
 	def start_season(self) -> None:
 		self.started = True
+		self.matchup_no = 0
 		if self.matchups:
 			return
 		sleep(.3)
@@ -368,6 +377,30 @@ class Table:
 		self.teams.sort(key=lambda t: t.abbr)
 		self.ties = [self.teams[i] for i in range(len(self.teams) - 1) if self.teams[i].get_tiebreaker_values() == self.teams[i + 1].get_tiebreaker_values()]
 
+
+
+	def export(self) -> None:
+		directory = Path("data/in_use") / (self.title.replace(" ", "_") + ".league")
+		directory.mkdir(parents=True, exist_ok=True)
+
+		with open(directory / "league_data.hex", "w") as league_data_file:
+			league_data_file.write("\n".join(
+				[
+				self.title,
+				self.teams,
+				self.ties,
+				self.matchups,
+				self.started,
+				self.ended,
+				self.matchup_no,
+				self.results]))
+
+		with open(directory / "matchups.hex", "w") as matchups_file:
+			matchups_file.write("\n".join(list(map(lambda x: x[0].get_code() + " " + x[1].get_code(), matchups))))
+
+		with open(directory / "team_data", "w") as team_data_file:
+			for team in self.get_teams():
+				print(*team.export_data(), file=team_data_file)
 
 	
 	# home then away
@@ -473,6 +506,7 @@ class Team:
 		self.points : int = 0
 		self.wins : int = 0 ; self.draws : int = 0 ; self.losses : int = 0
 		self.matches_played : int = 0
+		self.max_matches : int
 		self.home_goals : int = 0 ; self.away_goals : int = 0
 		self.goals_scored : int = 0 ; self.goals_conceded : int = 0 ; self.goal_difference : int = 0
 
@@ -493,6 +527,11 @@ class Team:
 
 
 	def add_scoreline(self, scored : int, conceded : int, *, home : bool) -> None:
+		if self.matches_played >= self.max_matches:
+			print("Already played all the matches!")
+			delay(.5)
+			return
+
 		state = "lose" if scored < conceded else ("win" if scored > conceded else "draw")
 		if home:
 			self.home_goals += scored
@@ -508,6 +547,7 @@ class Team:
 				self.losses += 1
 
 		self.recalibrate()
+		return
 
 	def get_info(self) -> dict:
 
@@ -530,6 +570,22 @@ class Team:
 			self.points,
 			self.goal_difference,
 			self.goals_scored
+		]
+
+	def export_data() -> List:
+		return [
+		self.name,
+		self.abbr,
+		self.code,
+		self.points,
+		self.wins,
+		self.draws,
+		self.losses,
+		self.matches_played,
+		self.max_matches,
+		self.home_goals,
+		self.away_goals,
+		self.goals_scored, self.goals_conceded, self.goal_difference
 		]
 
 	def __eq__(self, other) -> bool:
