@@ -42,8 +42,7 @@ class Table:
 	def await_inp(self) -> None:
 		threading.Thread(target=self.recieve_inp, daemon=True).start()
 
-	def __init__(self, 
-				title : str = "LEAGUE",) -> None:
+	def __init__(self, title : str = "LEAGUE",) -> None:
 		self.title : str = title
 		self.teams : List[Team] = []
 		self.ties : List[Team] = []
@@ -52,7 +51,7 @@ class Table:
 		self.ended : bool = False
 
 		self.matchup_no : int = -1
-		self.results : dict = {} # = {(matchup) : (scoreline resprectively)}
+		self.results : list = [] # = {(matchup) : (scoreline resprectively)}
 
 
 
@@ -126,9 +125,9 @@ class Table:
 		
 		key = Security()
 		key.set_code(league_data)
-		league_data = key.dehex().split("\n")
+		league_data = key.dehex_code().split("\n")
 		key.set_code(matchups)
-		matchups = key.dehex().split("\n")
+		matchups = key.dehex_code().split("\n")
 		new = Table(league_data.pop(0))
 		for data in league_data:
 			new.add_team(Team(*data.split(",")))
@@ -148,57 +147,7 @@ class Table:
 		
 		
 
-
-
-	def load_prev(self) -> None:
-		print("Searching...")
-		save_folder = Path("data/in_use")
-
-		# scan for presets
-		available_leagues = [folder for folder in preset_folder.iterdir() 
-					if folder.is_dir() and folder.suffix == ".league"]
-		sleep(.4)
-		print(f"Found {len(available_leagues)} league{"s" if len(available_leagues) - 1 else ""} in use!")
-		sleep(.5)
-		print("Select preset:")
-		sleep(.2)
-		for ind, league in enumerate(available_leagues):
-			league = league.with_suffix("available_leagues")
-			print(f"{ind+1} - {league.name.replace("-", "/")}")
-			sleep(.4)
-
-		def ask() -> int:
-			choice = input("\n")
-			return (int(choice) if 1 <= int(choice) <= len(available_leagues) else ask()) if choice.isdigit() else ask()
-		choice = ask()
-		chosen_preset = available_leagues[int(choice) - 1]
-		print(f"Loading {available_leagues[int(choice) - 1].with_suffix("")} preset...")
-		sleep(1)
 		
-		parent = Path("data/table_presets/Premier League 26-27.preset")
-		league_data = (parent / "league_data.hex").read_text()
-		matchups = (parent / "matchups.hex").read_text()
-		team_data = (parent / "team_data.hex").read_text()
-		
-		key = Security()
-		key.set_code(league_data)
-		league_data = key.dehex().split("\n")
-		key.set_code(matchups)
-		matchups = key.dehex().split("\n")
-		new = Table(league_data.pop(0))
-		
-		for data in league_data:
-			new.add_team(Team(*data.split(",")))
-		codes = list(map(Team.get_code, new.teams))
-		for matchup in matchups:
-			new.add_matchup(list(map(lambda team: new.teams[codes.index(team)], matchup.split(", "))))
-
-		sleep(1)
-
-		print("Complete!")
-		sleep(.5)
-
-		self.paste(new.copy())
 
 
 
@@ -325,7 +274,7 @@ class Table:
 					sleep(.4)
 
 			case "load":
-				self.load_prev()
+				self.import_save()
 
 			case "cancel":
 				return
@@ -384,23 +333,69 @@ class Table:
 		directory.mkdir(parents=True, exist_ok=True)
 
 		with open(directory / "league_data.hex", "w") as league_data_file:
-			league_data_file.write("\n".join(
+			league_data_file.write("\n".join(list(map(Security.enhex,
 				[
 				self.title,
-				self.teams,
-				self.ties,
-				self.matchups,
+				*list(map(Team.code,  self.ties)),
 				self.started,
 				self.ended,
 				self.matchup_no,
-				self.results]))
+				]))))
 
 		with open(directory / "matchups.hex", "w") as matchups_file:
-			matchups_file.write("\n".join(list(map(lambda x: x[0].get_code() + " " + x[1].get_code(), matchups))))
+			for matchup, score in zip(matchups, results):
+				print(f"{" ".join(list(map(Security.enhex, list(map(Team.code, matchup)))))}" + "-" + f"{" ".join(score)}", file=matchups_file)
 
-		with open(directory / "team_data", "w") as team_data_file:
+		with open(directory / "team_data.hex", "w") as team_data_file:
 			for team in self.get_teams():
-				print(*team.export_data(), file=team_data_file)
+				print(" ".join(list(map(Security.enhex, team.export_data()))), file=team_data_file)
+
+	def import_save(self) -> None:
+		print("Searching...")
+		save_folder = Path("data/in_use")
+
+		# scan for presets
+		available_leagues = [folder for folder in preset_folder.iterdir() 
+					if folder.is_dir() and folder.suffix == ".league"]
+		sleep(.4)
+		print(f"Found {len(available_leagues)} league{"s" if len(available_leagues) - 1 else ""} in use!")
+		sleep(.5)
+		print("Select preset:")
+		sleep(.2)
+		for ind, league in enumerate(available_leagues):
+			league = league.with_suffix("available_leagues")
+			print(f"{ind+1} - {league.name.replace("-", "/")}")
+			sleep(.4)
+
+		def ask() -> int:
+			choice = input("\n")
+			return (int(choice) if 1 <= int(choice) <= len(available_leagues) else ask()) if choice.isdigit() else ask()
+		choice = ask()
+		chosen_preset = available_leagues[int(choice) - 1]
+		print(f"Loading {available_leagues[int(choice) - 1].with_suffix("")} preset...")
+		sleep(1)
+		
+		parent = Path("data/table_presets/Premier League 26-27.preset")
+		league_data = Security.dehex((parent / "league_data.hex").read_text()).split("\n")
+		matchups = Security.dehex((parent / "matchups.hex").read_text()).split("\n")
+		team_data = Security.dehex((parent / "team_data.hex").read_text()).split("\n")
+		
+
+		self.title = league_data[0]
+		self.ties = list(map(lambda x: self.get_teams()[list(map(Team.get_code, self.get_teams())).index(x)], league_data[1].split()))
+		self.started = league_data[2] == "True"
+		self.ended = league_data[3] == "True"
+		self.matchup_no = int(league[4])
+
+
+
+		sleep(1)
+
+		print("Complete!")
+		sleep(.5)
+
+		self.paste(new.copy())
+
 
 	
 	# home then away
@@ -621,10 +616,19 @@ class Security:
 	def get_code(self) -> str:
 		return self.code
 
-	def enhex(self) -> str:
+	@staticmethod
+	def enhex(code : str) -> str:
 		return "\n".join(["{:04x}".format(ord(char)) for char in self.code])
 
-	def dehex(self) -> str:
+	@staticmethod
+	def dehex(code : str) -> str:
+		return "".join([chr(int(num, 16)) for num in self.code.split("\n")])
+
+
+	def enhex_code(self) -> str:
+		return "\n".join(["{:04x}".format(ord(char)) for char in self.code])
+
+	def dehex_code(self) -> str:
 		return "".join([chr(int(num, 16)) for num in self.code.split("\n")])
 
 
