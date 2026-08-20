@@ -206,7 +206,7 @@ class Table:
 	def create_matchups(self, auto : bool) -> list:
 		pairings = []
 		remaining = self.teams[:]
-
+		n = len(self.teams)
 		opponents = (n-1)
 		home_available = [opponents] * n
 		away_available = [opponents] * n
@@ -227,7 +227,7 @@ class Table:
 		else:
 			codes = list(map(lambda x: x.code, self.teams))
 			
-			n = len(self.teams)
+
 			
 			for i in range(total):
 				print(f"{i}/{total} matches completed")
@@ -311,8 +311,12 @@ class Table:
 	def start_season(self) -> None:
 		self.started = True
 		self.matchup_no = 0
+		self.results = [-1] * len(self.get_teams())
+		for team in self.get_teams():
+			team.max_matches = len(self.teams) - 2
 		if self.matchups:
 			return
+		
 		sleep(.3)
 		print("START SEASON!!!")
 		sleep(1)
@@ -334,21 +338,21 @@ class Table:
 
 		with open(directory / "league_data.hex", "w") as league_data_file:
 			league_data_file.write("\n".join(list(map(Security.enhex,
-				[
+				list(map(str, [
 				self.title,
-				*list(map(Team.code,  self.ties)),
+				*list(map(Team.get_code,  self.ties)),
 				self.started,
 				self.ended,
 				self.matchup_no,
-				]))))
+				]))))))
 
 		with open(directory / "matchups.hex", "w") as matchups_file:
-			for matchup, score in zip(matchups, results):
-				print(f"{" ".join(list(map(Security.enhex, list(map(Team.code, matchup)))))}" + "-" + f"{" ".join(score)}", file=matchups_file)
+			for matchup, score in zip(self.matchups, self.results):
+				print(Security.enhex(f"{" ".join(list(map(Team.get_code, matchup)))}" + "-" + f"{" ".join(score)}"), file=matchups_file)
 
 		with open(directory / "team_data.hex", "w") as team_data_file:
 			for team in self.get_teams():
-				print(" ".join(list(map(Security.enhex, team.export_data()))), file=team_data_file)
+				print(Security.enhex(" ".join(team.export_data()), file=team_data_file))
 
 	def import_save(self) -> None:
 		print("Searching...")
@@ -375,17 +379,59 @@ class Table:
 		print(f"Loading {available_leagues[int(choice) - 1].with_suffix("")} preset...")
 		sleep(1)
 		
+
+
 		parent = Path("data/table_presets/Premier League 26-27.preset")
 		league_data = Security.dehex((parent / "league_data.hex").read_text()).split("\n")
 		matchups = Security.dehex((parent / "matchups.hex").read_text()).split("\n")
 		team_data = Security.dehex((parent / "team_data.hex").read_text()).split("\n")
 		
+		
 
-		self.title = league_data[0]
-		self.ties = list(map(lambda x: self.get_teams()[list(map(Team.get_code, self.get_teams())).index(x)], league_data[1].split()))
-		self.started = league_data[2] == "True"
-		self.ended = league_data[3] == "True"
-		self.matchup_no = int(league[4])
+		new = Table(league_data[0])
+
+
+		# import from team_data file
+		'''
+		self.name,
+		self.abbr,
+		self.code,
+		self.points,
+		self.wins,
+		self.draws,
+		self.losses,
+		self.matches_played,
+		self.max_matches,
+		self.home_goals,
+		self.away_goals,
+		self.goals_scored, self.goals_conceded, self.goal_difference
+		'''
+
+		# import from league_data file
+
+		for data in team_data:
+			data = data.split()
+			team = Team(data[0])
+			
+
+
+		new.ties = list(map(lambda x: new.get_teams()[list(map(Team.get_code, new.get_teams())).index(x)], league_data[1].split()))
+		new.started = league_data[2] == "True"
+		new.ended = league_data[3] == "True"
+		new.matchup_no = int(league[4])
+
+
+
+
+		# import from matchups
+		# Security.enhex(f"{" ".join(list(map(Team.get_code, matchup)))}" + "-" + f"{" ".join(score)}")
+		matchups = matchups.split("-")
+		for m in matchups[0]:
+			m = m.split("-")
+			t1, t2 = list(map(lambda x: new.teams[list(map(Team.get_code, new.teams)).index(x)], m[0]))
+			result = list(map(int, m[1].split()))
+			new.add_matchup(t1, t2)
+		matchups[0]
 
 
 
@@ -567,7 +613,7 @@ class Team:
 			self.goals_scored
 		]
 
-	def export_data() -> List:
+	def export_data(self) -> List:
 		return [
 		self.name,
 		self.abbr,
@@ -618,11 +664,11 @@ class Security:
 
 	@staticmethod
 	def enhex(code : str) -> str:
-		return "\n".join(["{:04x}".format(ord(char)) for char in self.code])
+		return "\n".join(["{:04x}".format(ord(char)) for char in code])
 
 	@staticmethod
 	def dehex(code : str) -> str:
-		return "".join([chr(int(num, 16)) for num in self.code.split("\n")])
+		return "".join([chr(int(num, 16)) for num in code.split("\n")])
 
 
 	def enhex_code(self) -> str:
