@@ -311,7 +311,7 @@ class Table:
 	def start_season(self) -> None:
 		self.started = True
 		self.matchup_no = 0
-		self.results = [-1] * len(self.get_teams())
+		self.results = [(-1, -1)] * len(self.get_teams())
 		for team in self.get_teams():
 			team.max_matches = len(self.teams) - 2
 		if self.matchups:
@@ -348,18 +348,18 @@ class Table:
 
 		with open(directory / "matchups.hex", "w") as matchups_file:
 			for matchup, score in zip(self.matchups, self.results):
-				print(Security.enhex(f"{" ".join(list(map(Team.get_code, matchup)))}" + "-" + f"{" ".join(score)}"), file=matchups_file)
+				print(Security.enhex(f"{" ".join(list(map(Team.get_code, matchup)))}" + "-" + f"{" ".join(list(map(str, score)))}"), file=matchups_file)
 
 		with open(directory / "team_data.hex", "w") as team_data_file:
 			for team in self.get_teams():
-				print(Security.enhex(" ".join(team.export_data()), file=team_data_file))
+				print(Security.enhex(" ".join(list(map(str, team.export_data())))), file=team_data_file)
 
 	def import_save(self) -> None:
 		print("Searching...")
 		save_folder = Path("data/in_use")
 
 		# scan for presets
-		available_leagues = [folder for folder in preset_folder.iterdir() 
+		available_leagues = [folder for folder in save_folder.iterdir() 
 					if folder.is_dir() and folder.suffix == ".league"]
 		sleep(.4)
 		print(f"Found {len(available_leagues)} league{"s" if len(available_leagues) - 1 else ""} in use!")
@@ -367,7 +367,7 @@ class Table:
 		print("Select preset:")
 		sleep(.2)
 		for ind, league in enumerate(available_leagues):
-			league = league.with_suffix("available_leagues")
+			league = league.with_suffix(".league")
 			print(f"{ind+1} - {league.name.replace("-", "/")}")
 			sleep(.4)
 
@@ -412,6 +412,8 @@ class Table:
 		for data in team_data:
 			data = data.split()
 			team = Team(data[0])
+			team.load(data)
+		new.add_team(data)
 			
 
 
@@ -419,7 +421,7 @@ class Table:
 		new.started = league_data[2] == "True"
 		new.ended = league_data[3] == "True"
 		new.matchup_no = int(league[4])
-
+ 
 
 
 
@@ -429,7 +431,7 @@ class Table:
 		for m in matchups[0]:
 			m = m.split("-")
 			t1, t2 = list(map(lambda x: new.teams[list(map(Team.get_code, new.teams)).index(x)], m[0]))
-			result = list(map(int, m[1].split()))
+			result = tuple(map(int, m[1].split()))
 			new.add_matchup(t1, t2)
 		matchups[0]
 
@@ -628,6 +630,21 @@ class Team:
 		self.away_goals,
 		self.goals_scored, self.goals_conceded, self.goal_difference
 		]
+
+	def load(self, data : List) -> None:
+		self.abbr = data[1]
+		self.code = data[2]
+		self.points = int(data[3])
+		self.wins = int(data[4])
+		self.draws = int(data[5])
+		self.losses = int(data[6])
+		self.matches_played = int(data[7])
+		self.max_matches = int(data[8])
+		self.home_goals = int(data[9])
+		self.away_goals = int(data[10])
+		self.goals_scored  = int(data[11])
+		self.goals_conceded = int(data[12])
+		self.goal_difference = int(data[13])
 
 	def __eq__(self, other) -> bool:
 		return self.name == other.name
