@@ -94,15 +94,30 @@ class Table:
 	def remove_matchup(self, to_remove : Tuple(Team)) -> None:
 		self.matchups.remove(to_remove)
 
+	def increment_match_count(self) -> None:
+		self.matchup_no += 1
+
+	def get_current_matchup(self) -> Tuple:
+		return self.matchups[self.matchup_no]
+
+	def add_result(self, matchup : tuple, score : tuple) -> None:
+		if results[matchup]:
+			print("Scoreline already submitted!")
+			return
+		results[matchup] = score
 
 
-	def load_preset(self) -> None:
+	def load_preset(self) -> bool:
 		print("Searching...")
 		preset_folder = Path("data/table_presets")
 		sleep(.5)
 		# scan for presets
 		available_presets = [folder for folder in preset_folder.iterdir() 
 					if folder.is_dir() and folder.suffix == ".preset"]
+		if not available_presets:
+			print("No presets found!")
+			sleep(.3)
+			return True
 		print(f"Found {len(available_presets)} preset{"s" if len(available_presets) - 1 else ""}!")
 		sleep(.5)
 		print("Select preset:")
@@ -145,10 +160,6 @@ class Table:
 		
 
 		
-		
-
-		
-
 
 
 	def team_config(self) -> None:
@@ -203,7 +214,7 @@ class Table:
 		self.team_config()
 
 
-	def create_matchups(self, auto : bool) -> list:
+	def create_matchups(self, auto : bool) -> tuple:
 		pairings = []
 		remaining = self.teams[:]
 		n = len(self.teams)
@@ -249,7 +260,7 @@ class Table:
 				away_index = codes.index(away)
 				away_available[codes.index(away)] -= 1
 
-				pairings.append([self.teams[home_index], self.teams[away_index]])
+				pairings.append((self.teams[home_index], self.teams[away_index]))
 				sleep(.2)
 				input(f"{home} vs {away} add success - continue?\n")
 				print("\n\n\n")
@@ -262,19 +273,20 @@ class Table:
 		sleep(.5)
 		match ask:
 			case "preset":
-				self.load_preset()
+				if self.load_preset():
+					self.instantiate()
 
 			case "custom":
 				self.team_config()
 				while (choice := input("Manual or Automatic (does not account stadium) match creation?\n").lower().strip()) not in {"manual", "automatic", "auto"}:
-					pass
 					sleep(.3)
 					self.matchups = self.create_matchups("auto" in choice)
 					print("Match creation complete!")
 					sleep(.4)
 
 			case "load":
-				self.import_save()
+				if self.import_save():
+					self.instantiate()
 
 			case "cancel":
 				return
@@ -315,7 +327,11 @@ class Table:
 		for team in self.get_teams():
 			team.max_matches = len(self.teams) - 2
 		if self.matchups:
-			return
+			print(f"Resumed league data to match no {self.matchup_no}")
+			sleep(.3)
+			print("Next match: ", end="")
+			sleep(.2)
+			print(*self.get_current_matchup, sep=" vs ")
 		
 		sleep(.3)
 		print("START SEASON!!!")
@@ -361,6 +377,9 @@ class Table:
 		# scan for presets
 		available_leagues = [folder for folder in save_folder.iterdir() 
 					if folder.is_dir() and folder.suffix == ".league"]
+		if not available_leagues:
+			print("No leagues found!")
+			sleep(.3)
 		sleep(.4)
 		print(f"Found {len(available_leagues)} league{"s" if len(available_leagues) - 1 else ""} in use!")
 		sleep(.5)
@@ -376,18 +395,19 @@ class Table:
 			return (int(choice) if 1 <= int(choice) <= len(available_leagues) else ask()) if choice.isdigit() else ask()
 		choice = ask()
 		chosen_preset = available_leagues[int(choice) - 1]
-		print(f"Loading {available_leagues[int(choice) - 1].with_suffix("")} preset...")
+		print(f"Loading {available_leagues[int(choice) - 1].with_suffix(".league")} preset...")
 		sleep(1)
 		
 
 
-		parent = Path("data/table_presets/Premier League 26-27.preset")
-		league_data = Security.dehex((parent / "league_data.hex").read_text()).split("\n")
+		parent = available_leagues[int(choice) - 1]
+		league_data = Security.dehex((parent / "league_data.hex").read_text()).strip("").split("\n")
+		print((parent / "matchups.hex").read_text())
 		matchups = Security.dehex((parent / "matchups.hex").read_text()).split("\n")
 		team_data = Security.dehex((parent / "team_data.hex").read_text()).split("\n")
 		
 		
-
+f
 		new = Table(league_data[0])
 
 
@@ -433,7 +453,7 @@ class Table:
 			t1, t2 = list(map(lambda x: new.teams[list(map(Team.get_code, new.teams)).index(x)], m[0]))
 			result = tuple(map(int, m[1].split()))
 			new.add_matchup(t1, t2)
-		matchups[0]
+			self.add_result((t1, t2), result)
 
 
 
@@ -454,6 +474,8 @@ class Table:
 		team1.add_scoreline(res1, res2, home=True)
 		team2.add_scoreline(res2, res1, home=False)
 
+		self.increment_match_count()
+		self.add_result((team1, team2), (res1, res2))
 
 
 	def __str__(self) -> str:
