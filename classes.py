@@ -369,6 +369,8 @@ class Table:
 		with open(directory / "team_data.hex", "w") as team_data_file:
 			for team in self.get_teams():
 				print(Security.enhex(" ".join(list(map(str, team.export_data())))), file=team_data_file)
+		sleep(.8)
+		print("Upload complete!")
 
 	def import_save(self) -> None:
 		print("Searching...")
@@ -407,7 +409,7 @@ class Table:
 		team_data = Security.dehex((parent / "team_data.hex").read_text()).split("\n")
 		
 		
-f
+
 		new = Table(league_data[0])
 
 

@@ -6,6 +6,14 @@ import random
 
 
 
+def cycle() -> None:
+	while True:
+		score = 0
+
+
+def request_save() -> None:
+	pass
+
 
 def main() -> None:
 	print("\n\n\n")
@@ -18,6 +26,12 @@ def main() -> None:
 	league.start_season()
 
 	league.export()
+
+	while not league.ended:
+		cycle()
+		request_save()
+
+
 	
 
 
