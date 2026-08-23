@@ -379,7 +379,7 @@ class Table:
 		print(f"Loading {available_leagues[int(choice) - 1].with_suffix("")} preset...")
 		sleep(1)
 		
-branch?
+
 
 		parent = Path("data/table_presets/Premier League 26-27.preset")
 		league_data = Security.dehex((parent / "league_data.hex").read_text()).split("\n")
