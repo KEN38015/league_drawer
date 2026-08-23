@@ -407,7 +407,7 @@ class Table:
 		team_data = Security.dehex((parent / "team_data.hex").read_text()).split("\n")
 		
 		
-f
+
 		new = Table(league_data[0])
 
 
