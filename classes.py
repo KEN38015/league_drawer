@@ -2,6 +2,7 @@ import threading
 from time import sleep
 from pathlib import Path
 import random
+import sys
 
 
 
@@ -45,13 +46,13 @@ class Table:
 	def __init__(self, title : str = "LEAGUE",) -> None:
 		self.title : str = title
 		self.teams : List[Team] = []
-		self.ties : List[Team] = []
+		self.ties : List[List[Team]] = []
 		self.matchups : List[List[Team]]= []
 		self.started : bool = False
 		self.ended : bool = False
 
 		self.matchup_no : int = -1
-		self.results : list = [] # = {(matchup) : (scoreline resprectively)}
+		self.results : list = []
 
 
 
@@ -78,6 +79,7 @@ class Table:
 			print("Limit Reached!")
 			return
 		self.teams.append(team)
+		self.results.append([-1, -1])
 
 
 	def remove_team(self, team : Team) -> bool:
@@ -100,11 +102,11 @@ class Table:
 	def get_current_matchup(self) -> Tuple:
 		return self.matchups[self.matchup_no]
 
-	def add_result(self, matchup : tuple, score : tuple) -> None:
-		if results[matchup]:
+	def submit_scoreline(self, matchup : tuple, score : tuple) -> None:
+		if self.matchup_no < len(self.results):
 			print("Scoreline already submitted!")
 			return
-		results[matchup] = score
+		self.results.insert(self.matchup_no, score)
 
 
 	def load_preset(self) -> bool:
@@ -144,11 +146,13 @@ class Table:
 		key.set_code(matchups)
 		matchups = key.dehex_code().split("\n")
 		new = Table(league_data.pop(0))
+		print(league_data)
 		for data in league_data:
 			new.add_team(Team(*data.split(",")))
 		codes = list(map(Team.get_code, new.teams))
 		for matchup in matchups:
-			new.add_matchup(list(map(lambda team: new.teams[codes.index(team)], matchup.split(", "))))
+			print(*new.teams , sep=", ")
+			new.add_matchup(list(map(lambda team: new.get_teams()[codes.index(team)], matchup.split(","))))
 		sleep(1)
 
 		print("Complete!")
@@ -268,7 +272,7 @@ class Table:
 
 
 	def instantiate(self) -> None:
-		while (ask := input("preset, custom or load prev team creation?\n").lower().strip()) not in {"preset", "custom", "load"}:
+		while (ask := input("preset (preset), new custom table (new) or load prev (load) team creation?\n").lower().strip()) not in {"preset", "custom", "load"}:
 			sleep(.3)
 		sleep(.5)
 		match ask:
@@ -276,7 +280,7 @@ class Table:
 				if self.load_preset():
 					self.instantiate()
 
-			case "custom":
+			case "new":
 				self.team_config()
 				while (choice := input("Manual or Automatic (does not account stadium) match creation?\n").lower().strip()) not in {"manual", "automatic", "auto"}:
 					sleep(.3)
@@ -301,7 +305,7 @@ class Table:
 					break
 				sleep(.2)
 
-			while not (ask := input("miliseconds of delay for each display?\n").strip()).isdigit():
+			while not (delay := input("miliseconds of delay for each display?\n").strip()).isdigit():
 				print("whole number!")
 				sleep(.3)
 			sleep(.3)
@@ -315,7 +319,7 @@ class Table:
 				print(f"{ind+1} - ", end="")
 				print(*matchup, sep=" vs ")
 				if self.skipped:
-					sleep(int(ask) / 1000)
+					sleep(int(delay) / 1000)
 
 
 
@@ -327,11 +331,11 @@ class Table:
 		for team in self.get_teams():
 			team.max_matches = len(self.teams) - 2
 		if self.matchups:
-			print(f"Resumed league data to match no {self.matchup_no}")
+			print(f"Resumed league data to match no {self.matchup_no+1}")
 			sleep(.3)
 			print("Next match: ", end="")
 			sleep(.2)
-			print(*self.get_current_matchup, sep=" vs ")
+			print(*self.get_current_matchup(), sep=" vs ")
 		
 		sleep(.3)
 		print("START SEASON!!!")
@@ -348,29 +352,45 @@ class Table:
 
 
 
-	def export(self) -> None:
+	def save(self) -> None:
+		while (choice := input("save? (y/n)\n")) not in {"y", "n", "yes", "no"}:
+			sleep(.3)
+		sleep(.5)
+		if "n" in choice:
+			sleep(.3)
+			return
+
+		print("Saving...")
+		sleep(.5)
 		directory = Path("data/in_use") / (self.title.replace(" ", "_") + ".league")
 		directory.mkdir(parents=True, exist_ok=True)
 
 		with open(directory / "league_data.hex", "w") as league_data_file:
-			league_data_file.write("\n".join(list(map(Security.enhex,
-				list(map(str, [
+			if not (t := ",".join([" ".join(list(map(str, self.get_teams().index(tie)))) for tie in self.ties])):
+				t = 0
+			league_data_file.write(Security.enhex(
+				"\n".join(list(map(str, [
 				self.title,
-				*list(map(Team.get_code,  self.ties)),
+				t,
 				self.started,
 				self.ended,
 				self.matchup_no,
-				]))))))
+				])))))
 
 		with open(directory / "matchups.hex", "w") as matchups_file:
-			for matchup, score in zip(self.matchups, self.results):
-				print(Security.enhex(f"{" ".join(list(map(Team.get_code, matchup)))}" + "-" + f"{" ".join(list(map(str, score)))}"), file=matchups_file)
+			print(list(map(Team.get_abbr, self.get_teams())))
+			matchups_file.write(Security.enhex("\n".join([f"{self.get_teams().index(matchup[0])} {self.get_teams().index(matchup[1])}-{score[0]} {score[1]}" for matchup, score in zip(self.matchups, self.results)])))
 
 		with open(directory / "team_data.hex", "w") as team_data_file:
-			for team in self.get_teams():
-				print(Security.enhex(" ".join(list(map(str, team.export_data())))), file=team_data_file)
+			team_data_file.write(Security.enhex("\n".join([" ".join(list(map(str, team.export_data()))) for team in self.get_teams()])))
+
+
 		sleep(.8)
-		print("Upload complete!")
+		print("Export complete!")
+		sleep(1)
+
+
+
 
 	def import_save(self) -> None:
 		print("Searching...")
@@ -382,13 +402,14 @@ class Table:
 		if not available_leagues:
 			print("No leagues found!")
 			sleep(.3)
+			return
 		sleep(.4)
 		print(f"Found {len(available_leagues)} league{"s" if len(available_leagues) - 1 else ""} in use!")
 		sleep(.5)
 		print("Select preset:")
 		sleep(.2)
 		for ind, league in enumerate(available_leagues):
-			league = league.with_suffix(".league")
+			league == league.with_suffix(".league")
 			print(f"{ind+1} - {league.name.replace("-", "/")}")
 			sleep(.4)
 
@@ -403,13 +424,12 @@ class Table:
 
 
 		parent = available_leagues[int(choice) - 1]
-		league_data = Security.dehex((parent / "league_data.hex").read_text()).strip("").split("\n")
-		print((parent / "matchups.hex").read_text())
+		league_data = Security.dehex((parent / "league_data.hex").read_text()).split("\n")
 		matchups = Security.dehex((parent / "matchups.hex").read_text()).split("\n")
 		team_data = Security.dehex((parent / "team_data.hex").read_text()).split("\n")
 		
-		
 
+		
 		new = Table(league_data[0])
 
 
@@ -429,33 +449,29 @@ class Table:
 		self.goals_scored, self.goals_conceded, self.goal_difference
 		'''
 
-		# import from league_data file
-
+		# import from league_data fil
 		for data in team_data:
 			data = data.split()
-			team = Team(data[0])
+			team = Team(*list(map(lambda s: s.replace("_", " "), data[0:3])))
+			print(team.abbr)
 			team.load(data)
-		new.add_team(data)
+			new.add_team(team)
 			
-
-
-		new.ties = list(map(lambda x: new.get_teams()[list(map(Team.get_code, new.get_teams())).index(x)], league_data[1].split()))
+		if int(league_data[1]):
+			new.ties = [[new.get_teams()[tie] for tie in tie_set.split()] for tie_set in league_data[1].split(",")]
 		new.started = league_data[2] == "True"
 		new.ended = league_data[3] == "True"
-		new.matchup_no = int(league[4])
+		new.matchup_no = int(league_data[4])
  
 
 
 
-		# import from matchups
-		# Security.enhex(f"{" ".join(list(map(Team.get_code, matchup)))}" + "-" + f"{" ".join(score)}")
-		matchups = matchups.split("-")
-		for m in matchups[0]:
-			m = m.split("-")
-			t1, t2 = list(map(lambda x: new.teams[list(map(Team.get_code, new.teams)).index(x)], m[0]))
+		for m in matchups:
+			m = m.split("-", 1)
+			t1, t2 = list(map(lambda x: new.get_teams()[int(x)], m[0].split()))
 			result = tuple(map(int, m[1].split()))
-			new.add_matchup(t1, t2)
-			self.add_result((t1, t2), result)
+			new.add_matchup((t1, t2))
+			self.add_result((t1, result[0]), (t2, result[1]))
 
 
 
@@ -473,11 +489,16 @@ class Table:
 		team1, res1 = data1
 		team2, res2 = data2
 
-		team1.add_scoreline(res1, res2, home=True)
-		team2.add_scoreline(res2, res1, home=False)
+		team1.add_scoreline(int(res1), int(res2), home=True)
+		team2.add_scoreline(int(res2), int(res1), home=False)
 
 		self.increment_match_count()
-		self.add_result((team1, team2), (res1, res2))
+		self.submit_scoreline((team1, team2), (res1, res2))
+
+
+
+	def show_fixtures() -> None:
+		pass
 
 
 	def __str__(self) -> str:
@@ -532,6 +553,9 @@ class Table:
 			lines.append("|".join(text) + "|")
 
 		lines.append(border("="))
+		lines.append("\n")
+		text = f"Current matchup: {self.get_current_matchup()[0]} vs. {self.get_current_matchup()[1]}"
+		lines.append(" " * (len(text) // 2 - 2) + text)
 		return "\n".join(lines)
 
 
@@ -640,9 +664,9 @@ class Team:
 		]
 
 	def export_data(self) -> List:
-		return [
-		self.name,
-		self.abbr,
+		return list(map(str, [
+		(self.name.replace(" ", "_")),
+		(self.abbr.replace(" ", "_")),
 		self.code,
 		self.points,
 		self.wins,
@@ -653,11 +677,9 @@ class Team:
 		self.home_goals,
 		self.away_goals,
 		self.goals_scored, self.goals_conceded, self.goal_difference
-		]
+		]))
 
 	def load(self, data : List) -> None:
-		self.abbr = data[1]
-		self.code = data[2]
 		self.points = int(data[3])
 		self.wins = int(data[4])
 		self.draws = int(data[5])
@@ -705,7 +727,11 @@ class Security:
 
 	@staticmethod
 	def enhex(code : str) -> str:
-		return "\n".join(["{:04x}".format(ord(char)) for char in code])
+		if type(code) != str:
+			print(type(code))
+			raise TypeError
+			print("parse error!", file=sys.stderr)
+		return "\n".join(["{:04x}".format(ord(char)) for char in str(code)])
 
 	@staticmethod
 	def dehex(code : str) -> str:
@@ -719,9 +745,7 @@ class Security:
 		return "".join([chr(int(num, 16)) for num in self.code.split("\n")])
 
 
-
 # key = Security()
-# f = Path("data/table_presets/Premier League 26-27.preset/matchups.hex")
-# key.set_code(f.read_text())
-# f.write_text(key.enhex())
-# print(key.dehex())
+# f = Path("data/table_presets/Premier League 26-27.preset/league_data.hex")
+# f.write_text(key.enhex(f.read_text()))
+# print(Security.enhex("Premier_League"))

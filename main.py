@@ -6,28 +6,16 @@ import random
 
 
 
-def cycle(league : Table) -> None:
-	print("Current matchup is:")
-	sleep(.3)
-	print(*league.get_current_matchup(), sep=" vs ")
-	home, away = league.get_current_matchup()
-	sleep(1)
-	while not (home_score := input(f"{home} score?")).isdigit():
-		sleep(.3)
-		print("Can only be a natural number!")
+
+def display(league : Table) -> None:
 	sleep(.5)
-
-	while not (away_score := input(f"{away} score?")).isdigit():
-		sleep(.3)
-		print("Can only be a natural number!")
-	sleep(.5)
-
-	
+	print(league)
 
 
-def request_save() -> None:
+
+
+def submit(league : Table) -> None:
 	pass
-
 
 def main() -> None:
 	print("\n\n\n")
@@ -35,18 +23,66 @@ def main() -> None:
 	sleep(1)
 
 	league = Table()
+
 	league.instantiate()
-	sleep(.5)
 	league.start_season()
 
-	league.export()
 
 	while not league.ended:
-		cycle()
-		request_save()
+		options = ["display", "submit", "history", "fixtures", "save", "exit"]
+		prompts = [
+			"show table", 
+			"submit next scorline",
+			"see previous matches",
+			"see match fixtures",
+			"save contents",
+			"exit",
+		]
+		print("What do you wish to do?")
+		sleep(.2)
+		for prompt, option in zip(prompts, options):
+			print(f"\t{prompt.capitalize()} ({option})")
+			sleep(.1)
+
+		while (choice := input().lower().strip()) not in options:
+			sleep(.2)
+			print("Not in choices!")
+		sleep(.7)
+
+		match choice:
+			case "display":
+				display(league)
 
 
-	
+			case "submit":
+				submit(league)
+
+
+			case "history":
+				pass
+
+
+			case "fixtures":
+				pass
+
+
+			case "save":
+				pass
+
+
+			case "exit":
+				pass
+
+		sleep(.5)
+
+
+
+		
+
+
+
+
+
 
 
 		
