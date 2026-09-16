@@ -103,10 +103,8 @@ class Table:
 		return self.matchups[self.matchup_no]
 
 	def submit_scoreline(self, matchup : tuple, score : tuple) -> None:
-		if self.matchup_no < len(self.results):
-			print("Scoreline already submitted!")
-			return
-		self.results.insert(self.matchup_no, score)
+		self.results.append(score)
+		self.increment_match_count()
 
 
 	def load_preset(self) -> bool:
@@ -146,12 +144,10 @@ class Table:
 		key.set_code(matchups)
 		matchups = key.dehex_code().split("\n")
 		new = Table(league_data.pop(0))
-		print(league_data)
 		for data in league_data:
 			new.add_team(Team(*data.split(",")))
 		codes = list(map(Team.get_code, new.teams))
 		for matchup in matchups:
-			print(*new.teams , sep=", ")
 			new.add_matchup(list(map(lambda team: new.get_teams()[codes.index(team)], matchup.split(","))))
 		sleep(1)
 
@@ -300,27 +296,7 @@ class Table:
 
 		if "y" in ask:
 			
-			while "code" not in (ask := input("print in team name or team code?\n").strip().lower()):
-				if "name" in ask:
-					break
-				sleep(.2)
-
-			while not (delay := input("miliseconds of delay for each display?\n").strip()).isdigit():
-				print("whole number!")
-				sleep(.3)
-			sleep(.3)
-			print("(enter to skip)")
-			sleep(.5)
-
-			
-			self.await_inp()
-			for ind, matchup in enumerate(self.matchups):
-				matchup = list(map(Team.get_name if ask == "name" else Team.get_code, matchup))
-				print(f"{ind+1} - ", end="")
-				print(*matchup, sep=" vs ")
-				if self.skipped:
-					sleep(int(delay) / 1000)
-
+			self.show_fixtures()
 
 
 
@@ -366,6 +342,7 @@ class Table:
 		directory.mkdir(parents=True, exist_ok=True)
 
 		with open(directory / "league_data.hex", "w") as league_data_file:
+			
 			if not (t := ",".join([" ".join(list(map(str, self.get_teams().index(tie)))) for tie in self.ties])):
 				t = 0
 			league_data_file.write(Security.enhex(
@@ -378,8 +355,8 @@ class Table:
 				])))))
 
 		with open(directory / "matchups.hex", "w") as matchups_file:
-			print(list(map(Team.get_abbr, self.get_teams())))
-			matchups_file.write(Security.enhex("\n".join([f"{self.get_teams().index(matchup[0])} {self.get_teams().index(matchup[1])}-{score[0]} {score[1]}" for matchup, score in zip(self.matchups, self.results)])))
+			print(self.results, self.matchups)
+			matchups_file.write(Security.enhex("\n".join([f"{self.get_teams().index(self.matchups[ind][0])} {self.get_teams().index(self.matchups[ind][1])}-{self.results[ind][0]} {self.results[ind][1]}" for ind in range(len(self.matchups))])))
 
 		with open(directory / "team_data.hex", "w") as team_data_file:
 			team_data_file.write(Security.enhex("\n".join([" ".join(list(map(str, team.export_data()))) for team in self.get_teams()])))
@@ -392,7 +369,7 @@ class Table:
 
 
 
-	def import_save(self) -> None:
+	def import_save(self) -> bool:
 		print("Searching...")
 		save_folder = Path("data/in_use")
 
@@ -402,7 +379,7 @@ class Table:
 		if not available_leagues:
 			print("No leagues found!")
 			sleep(.3)
-			return
+			return True
 		sleep(.4)
 		print(f"Found {len(available_leagues)} league{"s" if len(available_leagues) - 1 else ""} in use!")
 		sleep(.5)
@@ -481,7 +458,7 @@ class Table:
 		sleep(.5)
 
 		self.paste(new.copy())
-
+		return False
 
 	
 	# home then away
@@ -497,8 +474,25 @@ class Table:
 
 
 
-	def show_fixtures() -> None:
-		pass
+	def show_fixtures(self) -> None:
+		while (ask := input("print in team name or team code?\n").strip().lower()) not in {"code", "name"}:
+			sleep(.2)
+
+		while not (delay := input("miliseconds of delay for each display?\n").strip()).isdigit():
+			print("whole number!")
+			sleep(.3)
+		sleep(.3)
+		print("(enter to skip)")
+		sleep(.5)
+
+		
+		self.await_inp()
+		for ind, matchup in enumerate(self.matchups):
+			matchup = list(map(Team.get_name if ask == "name" else Team.get_code, matchup))
+			print(f"{ind+1} - ", end="")
+			print(*matchup, sep=" vs ")
+			if self.skipped:
+				sleep(int(delay) / 1000)
 
 
 	def __str__(self) -> str:
@@ -728,7 +722,6 @@ class Security:
 	@staticmethod
 	def enhex(code : str) -> str:
 		if type(code) != str:
-			print(type(code))
 			raise TypeError
 			print("parse error!", file=sys.stderr)
 		return "\n".join(["{:04x}".format(ord(char)) for char in str(code)])
