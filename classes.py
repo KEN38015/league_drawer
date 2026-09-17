@@ -303,9 +303,10 @@ class Table:
 	def start_season(self) -> None:
 		self.started = True
 		self.matchup_no = 0
-		self.results = [(-1, -1)] * len(self.get_teams())
+		self.results = [(-1, -1)] * len(self.get_teams()) * (len(self.get_teams()) - 1) * 2
 		for team in self.get_teams():
 			team.max_matches = len(self.teams) - 2
+			team.recalibrate()
 		if self.matchups:
 			print(f"Resumed league data to match no {self.matchup_no+1}")
 			sleep(.3)
@@ -344,7 +345,7 @@ class Table:
 		with open(directory / "league_data.hex", "w") as league_data_file:
 			
 			if not (t := ",".join([" ".join(list(map(str, self.get_teams().index(tie)))) for tie in self.ties])):
-				t = 0
+				t = ""
 			league_data_file.write(Security.enhex(
 				"\n".join(list(map(str, [
 				self.title,
@@ -355,7 +356,6 @@ class Table:
 				])))))
 
 		with open(directory / "matchups.hex", "w") as matchups_file:
-			print(self.results, self.matchups)
 			matchups_file.write(Security.enhex("\n".join([f"{self.get_teams().index(self.matchups[ind][0])} {self.get_teams().index(self.matchups[ind][1])}-{self.results[ind][0]} {self.results[ind][1]}" for ind in range(len(self.matchups))])))
 
 		with open(directory / "team_data.hex", "w") as team_data_file:
@@ -430,11 +430,10 @@ class Table:
 		for data in team_data:
 			data = data.split()
 			team = Team(*list(map(lambda s: s.replace("_", " "), data[0:3])))
-			print(team.abbr)
 			team.load(data)
 			new.add_team(team)
 			
-		if int(league_data[1]):
+		if league_data[1]:
 			new.ties = [[new.get_teams()[tie] for tie in tie_set.split()] for tie_set in league_data[1].split(",")]
 		new.started = league_data[2] == "True"
 		new.ended = league_data[3] == "True"
@@ -526,7 +525,7 @@ class Table:
 
 		identifiers : list = ["| R |"]
 		
-		longest_name = len(max(self.teams, key=lambda x: len(x.abbr)).abbr) + 2
+		longest_name = len(max(self.teams, key=lambda x: len(x.abbr)).abbr) + 1
 		identifiers.append(" " * (longest_name // 2 - 2) + "Name" + " " * (longest_name // 2 - 2) + "|")
 		for stat in self.stats_showing:
 			key, trailings = self.existing_stats[stat]
@@ -612,12 +611,14 @@ class Team:
 
 
 	def add_scoreline(self, scored : int, conceded : int, *, home : bool) -> None:
+		self.recalibrate()
 		if self.matches_played >= self.max_matches:
-			print("Already played all the matches!")
-			delay(.5)
+			print(f"Already played all the matches!")
+			self.recalibrate()
+			sleep(.5)
 			return
 
-		state = "lose" if scored < conceded else ("win" if scored > conceded else "draw")
+		state = "lose" if scored < conceded else ("win" if scored > conceded else ("null" if scored == -1 or conceded == -1 else "draw"))
 		if home:
 			self.home_goals += scored
 		else:
@@ -630,6 +631,8 @@ class Team:
 				self.draws += 1
 			case "lose":
 				self.losses += 1
+			case "null":
+				pass
 
 		self.recalibrate()
 		return
@@ -686,6 +689,7 @@ class Team:
 		self.goals_conceded = int(data[12])
 		self.goal_difference = int(data[13])
 
+
 	def __eq__(self, other) -> bool:
 		return self.name == other.name
 
@@ -728,14 +732,14 @@ class Security:
 
 	@staticmethod
 	def dehex(code : str) -> str:
-		return "".join([chr(int(num, 16)) for num in code.split("\n")])
+		return "".join([chr(int(num if num else "0", 16)) for num in code.split("\n")])
 
 
 	def enhex_code(self) -> str:
 		return "\n".join(["{:04x}".format(ord(char)) for char in self.code])
 
 	def dehex_code(self) -> str:
-		return "".join([chr(int(num, 16)) for num in self.code.split("\n")])
+		return "".join([chr(int(num if num else "0", 16)) for num in self.code.split("\n")])
 
 
 # key = Security()

@@ -85,13 +85,14 @@ def main() -> None:
 
 
 	while not league.ended:
-		options = ["display", "submit", "history", "fixtures", "save", "exit"]
+		options = ["display", "submit", "history", "fixtures", "save", "delete", "exit"]
 		prompts = [
 			"show table", 
 			"submit next scorline",
 			"see previous matches",
 			"see match fixtures",
 			"save contents",
+			"delete table",
 			"exit",
 		]
 		print("What do you wish to do?")
@@ -125,7 +126,8 @@ def main() -> None:
 			case "save":
 				league.save()
 
-
+			case "delete":
+				pass
 			case _:
 				break
 
