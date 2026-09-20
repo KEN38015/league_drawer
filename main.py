@@ -112,7 +112,10 @@ def main() -> None:
 
 
 			case "submit":
-				league.submit_scoreline(league.get_current_matchup, submit(league))
+				print(league.get_current_matchup(), s := submit(league))
+				league.add_result(
+					league.get_current_matchup(), s
+					)
 
 
 			case "history":
@@ -128,6 +131,7 @@ def main() -> None:
 
 			case "delete":
 				pass
+
 			case _:
 				break
 
