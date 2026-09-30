@@ -39,8 +39,13 @@ def submit(league : Table) -> tuple(int):
 		print("?")
 
 	if "n" in choice:
-		print("Exitting...")
-		return
+		while (is_exit := input("Exit (exit) or submit new (new)? ")) not in {"exit", "new"}:
+			sleep(.2)
+			print("?")
+		if is_exit == "exit":
+			print("Exitting...")
+			return None
+		return submit(league)
 
 	return (home_score, away_score)
 
@@ -54,10 +59,12 @@ def show_fixtures(league : Table) -> None:
 		league.show_fixtures()
 	else:
 		print("What match number?")
-		while not (num := input()).isdigit():
+		while (num := input()).isdigit():
+			if len(league.matchups)+1 > num > 0:
+				break
 			sleep(.3)
 		sleep(.5)
-		print(f"match no {int(num)}:\n")
+		print(f"match no {int(num)-1}:\n")
 		print(*league.matchups[int(num)], sep=" vs ")
 
 
@@ -111,11 +118,10 @@ def main() -> None:
 				display(league)
 
 
-			case "submit":
-				print(league.get_current_matchup(), s := submit(league))
-				league.add_result(
-					league.get_current_matchup(), s
-					)
+			case "submit": 
+				if (s := submit(league)) is None:
+					continue
+				league.add_result(league.get_current_matchup(), s)
 
 
 			case "history":
@@ -133,7 +139,7 @@ def main() -> None:
 				pass
 
 			case _:
-				break
+				main()
 
 		sleep(.5)
 	else:

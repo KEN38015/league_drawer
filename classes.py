@@ -103,7 +103,8 @@ class Table:
 		return tuple(self.matchups[self.matchup_no])
 
 	def submit_scoreline(self, matchup : tuple, score : tuple) -> None:
-		self.results.append(score)
+		self.results.insert(self.matchup_no, score)
+		self.results.pop()
 		self.increment_match_count()
 
 
@@ -303,7 +304,7 @@ class Table:
 	def start_season(self) -> None:
 		self.started = True
 		self.matchup_no = 0
-		self.results = [(-1, -1)] * len(self.get_teams())
+		self.results = [[-1, -1]] * (len(self.teams)-1) * (len(self.teams))
 		for team in self.get_teams():
 			team.max_matches = len(self.teams) - 2
 		if self.matchups:
@@ -321,10 +322,11 @@ class Table:
 		pass
 
 	def sort_table(self) -> None:
-		if not self.started:
-			self.teams.sort(key=lambda t: (-t.points, -t.goal_difference, -t.away_goals))
+		if self.started:
+			self.teams.sort(key=lambda t: (-t.points, -t.goal_difference, -t.away_goals, t.name))
+			return
 		self.teams.sort(key=lambda t: t.abbr)
-		self.ties = [self.teams[i] for i in range(len(self.teams) - 1) if self.teams[i].get_tiebreaker_values() == self.teams[i + 1].get_tiebreaker_values()]
+		self.ties = [[self.teams[i] for i in range(len(self.teams)-1) if self.teams[i].get_tiebreaker_values() == self.teams[i + 1].get_tiebreaker_values()] for j in range(len(self.teams))]
 
 
 
@@ -342,7 +344,7 @@ class Table:
 		directory.mkdir(parents=True, exist_ok=True)
 
 		with open(directory / "league_data.hex", "w") as league_data_file:
-			
+			print(self.ties)
 			if not (t := ",".join([" ".join(list(map(str, self.get_teams().index(tie)))) for tie in self.ties])):
 				t = 0
 			league_data_file.write(Security.enhex(
@@ -355,8 +357,9 @@ class Table:
 				])))))
 
 		with open(directory / "matchups.hex", "w") as matchups_file:
-			print(self.results, self.matchups) 
-			matchups_file.write(Security.enhex("\n".join([f"{self.get_teams().index(self.matchups[ind][0])} {self.get_teams().index(self.matchups[ind][1])}-{self.results[ind][0]} {self.results[ind][1]}" for ind in range(len(self.matchups))])))
+			print(len(self.results))
+			matchups_file.write(Security.enhex("\n".join([f'''{self.get_teams().index(self.matchups[ind][0])} {self.get_teams().index(self.matchups[ind][1])}-{self.results[ind][0]} {self.results[ind][1]}''' 
+																					for ind in range(len(self.matchups))])))
 
 		with open(directory / "team_data.hex", "w") as team_data_file:
 			team_data_file.write(Security.enhex("\n".join([" ".join(list(map(str, team.export_data()))) for team in self.get_teams()])))
@@ -435,7 +438,7 @@ class Table:
 			new.add_team(team)
 			
 		if league_data[1]:
-			new.ties = [[new.get_teams()[tie] for tie in tie_set.split()] for tie_set in league_data[1].split(",")]
+			new.ties = [[new.get_teams()[int(tie)] for tie in tie_set.split()] for tie_set in league_data[1].split(",")]
 		new.started = league_data[2] == "True"
 		new.ended = league_data[3] == "True"
 		new.matchup_no = int(league_data[4])
@@ -445,10 +448,11 @@ class Table:
 
 		for m in matchups:
 			m = m.split("-", 1)
+			print(m)
 			t1, t2 = list(map(lambda x: new.get_teams()[int(x)], m[0].split()))
 			result = tuple(map(int, m[1].split()))
 			new.add_matchup((t1, t2))
-			self.add_result((t1, result[0]), (t2, result[1]))
+			self.add_result((t1, t2), (result[0], result[1]))
 
 
 
@@ -526,7 +530,7 @@ class Table:
 
 		identifiers : list = ["| R |"]
 		
-		longest_name = len(max(self.teams, key=lambda x: len(x.abbr)).abbr) + 2
+		longest_name = len(max(self.teams, key=lambda x: len(x.abbr)).abbr) + 1
 		identifiers.append(" " * (longest_name // 2 - 2) + "Name" + " " * (longest_name // 2 - 2) + "|")
 		for stat in self.stats_showing:
 			key, trailings = self.existing_stats[stat]
@@ -614,10 +618,10 @@ class Team:
 	def add_scoreline(self, scored : int, conceded : int, *, home : bool) -> None:
 		if self.matches_played >= self.max_matches:
 			print("Already played all the matches!")
-			delay(.5)
+			sleep(.5)
 			return
 
-		state = "lose" if scored < conceded else ("win" if scored > conceded else "draw")
+		state = "lose" if scored < conceded else ("win" if scored > conceded else ("null" if scored == conceded == -1 else "draw"))
 		if home:
 			self.home_goals += scored
 		else:
@@ -630,6 +634,8 @@ class Team:
 				self.draws += 1
 			case "lose":
 				self.losses += 1
+			case "null":
+				pass
 
 		self.recalibrate()
 		return
