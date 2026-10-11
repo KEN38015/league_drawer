@@ -9,7 +9,7 @@ import random
 
 def display(league : Table) -> None:
 	sleep(.5)
-	print(league)
+	OUTPUT(league)
 
 
 
@@ -20,30 +20,30 @@ def submit(league : Table) -> tuple(int):
 		return int(inp) if inp.isdigit() else ask_score()
 
 	home_team, away_team = league.get_current_matchup()
-	print(f"Current matchup is {home_team} against {away_team}")
+	OUTPUT(f"Current matchup is {home_team} against {away_team}")
 	sleep(.4)
 
-	print(f"Score for {home_team} (home team)?")
+	OUTPUT(f"Score for {home_team} (home team)?")
 	home_score = ask_score()
 	sleep(.6)
 
-	print(f"Score for {away_team} (away team)?")
+	OUTPUT(f"Score for {away_team} (away team)?")
 	away_score = ask_score()
 	sleep(.6)
 
-	print(f"Submitting score for {home_team} vs {away_team}:")
-	print(f"{home_score} - {away_score}?")
+	OUTPUT(f"Submitting score for {home_team} vs {away_team}:")
+	OUTPUT(f"{home_score} - {away_score}?")
 	sleep(.5)
 	while (choice := input("Submit? ")) not in {"yes", "no", "y", "n"}:
 		sleep(.2)
-		print("?")
+		OUTPUT("?")
 
 	if "n" in choice:
 		while (is_exit := input("Exit (exit) or submit new (new)? ")) not in {"exit", "new"}:
 			sleep(.2)
-			print("?")
+			OUTPUT("?")
 		if is_exit == "exit":
-			print("Exitting...")
+			OUTPUT("Exitting...")
 			return None
 		return submit(league)
 
@@ -52,37 +52,64 @@ def submit(league : Table) -> tuple(int):
 
 
 def show_fixtures(league : Table) -> None:
-	print("Show all matches (all) or a single match (single)?")
+	OUTPUT("Show all matches (all) or a single match (single)?")
 	while (choice := input().lower()) not in {"all", "single"}:
 		sleep(.2)
 	if choice == "all":
 		league.show_fixtures()
 	else:
-		print("What match number?")
-		while (num := input()).isdigit():
-			if len(league.matchups)+1 > num > 0:
-				break
+		OUTPUT("What match number?")
+
+		while True:
+			num = input()
 			sleep(.3)
-		sleep(.5)
-		print(f"match no {int(num)-1}:\n")
-		print(*league.matchups[int(num)], sep=" vs ")
+			if not num.isdigit():
+				OUTPUT("Positive whole numbers only!")
+				sleep(.5)
+				continue
+			if not len(league.matchups)+1 > int(num) > 0:
+				OUTPUT("match number out of range!")
+				sleep(.5)
+				continue
+			break
+		sleep(.3)
+		OUTPUT(f"match no {int(num)}:\n")
+		OUTPUT(*league.matchups[int(num)-1], sep=" vs ")
 
 
 
 def show_history(league : Table) -> None:
 	sleep(.3)
 	if league.matchup_no < 1:
-		print("No matches were played yet!")
+		OUTPUT("No matches were played yet!")
 		return
-	print(f"{league.matchup_no} matche{"s" if league.matchup_no - 1 else ""} were played!")
-	for ind in range(1, league.matchup_no+1):
-		print(f"{ind}. {league.matchups[ind][0]} - {league.matchups[ind][1]}")
-		print(f"\t{league.results[ind][0]} {league.results[ind][1]}")
+	OUTPUT(f"{league.matchup_no} match{"es" if league.matchup_no - 1 else ""} were played!")
+	for ind in range(1, league.matchup_no):
+		OUTPUT(f"{ind}. {league.matchups[ind][0]} - {league.matchups[ind][1]}")
+		home_res, away_res = league.results[ind][0], league.results[ind][1]
+		symbol = "=" if home_res == away_res else (">" if home_res > away_res else "<")
+		OUTPUT(f"\t{home_res} {symbol} {away_res}")
 
+
+def delete(league : Table) -> None:
+	sleep(.3)
+	OUTPUT("CONFIRM DELETE???")
+	while (is_del := input()) not in {"y", "n", "yes", "no"}:
+		sleep(.3)
+	sleep(.5)
+	OUTPUT("deleting", end=".")
+	for _ in range(5):
+		OUTPUT(".", end="")
+	directory = Path("data/in_use") / (self.title.replace(" ", "_") + ".league")
+	for child in directory.iterdir():
+		child.unlink()
+	directory.rmdir()
+	OUTPUT(f"Deleted file {directory.name}, exitting to main menu")
+	sleep(1)
 
 def main() -> None:
-	print("\n\n\n")
-	print("\t\t\t\t\t&&&LEAGUE DRAWER&&&")
+	OUTPUT("\n\n\n")
+	OUTPUT("\t\t\t\t\t&&&LEAGUE DRAWER&&&")
 	sleep(1)
 
 	league = Table()
@@ -92,9 +119,10 @@ def main() -> None:
 
 
 	while not league.ended:
-		options = ["display", "submit", "history", "fixtures", "save", "delete", "exit"]
+		options = ["display", "config", "submit", "history", "fixtures", "save", "delete", "exit"]
 		prompts = [
 			"show table", 
+			"configure table",
 			"submit next scorline",
 			"see previous matches",
 			"see match fixtures",
@@ -102,15 +130,15 @@ def main() -> None:
 			"delete table",
 			"exit",
 		]
-		print("What do you wish to do?")
+		OUTPUT("What do you wish to do?")
 		sleep(.2)
 		for prompt, option in zip(prompts, options):
-			print(f"\t{prompt.capitalize()} ({option})")
+			OUTPUT(f"\t({option}) {prompt.capitalize()}")
 			sleep(.1)
 
 		while (choice := input().lower().strip()) not in options:
 			sleep(.2)
-			print("Not in choices!")
+			OUTPUT("Not in choices!")
 		sleep(.7)
 
 		match choice:
@@ -136,10 +164,15 @@ def main() -> None:
 				league.save()
 
 			case "delete":
-				pass
-
-			case _:
+				delete(league)
 				main()
+
+			case "config":
+				league.config_table()
+
+			case "exit":
+				main()
+
 
 		sleep(.5)
 	else:

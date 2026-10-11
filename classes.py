@@ -5,6 +5,16 @@ import random
 import sys
 
 
+def OUTPUT(*args, end : str = "\n", sep : str = " ") -> None:
+	print(*args, end=end, sep=sep)
+
+def INPUT(prompt : str):
+	input(prompt)
+
+
+class CorruptedFile(Exception):
+	def __init__(self, msg : str):
+		super().__init__(msg)
 
 
 class Table:
@@ -25,14 +35,6 @@ class Table:
 		"goals conceded" : ("GA", 2),
 		"goal difference" : ("GD", 2),
 	}
-	stats_showing = [
-		"matches played",
-		"wins",
-		"draws",
-		"losses",
-		"points",
-		
-	]
 
 	skipped = True
 
@@ -41,7 +43,8 @@ class Table:
 		self.skipped = False
 
 	def await_inp(self) -> None:
-		threading.Thread(target=self.recieve_inp, daemon=True).start()
+		self.thread = threading.Thread(target=self.recieve_inp, daemon=True)
+		self.thread.start()
 
 	def __init__(self, title : str = "LEAGUE",) -> None:
 		self.title : str = title
@@ -50,19 +53,26 @@ class Table:
 		self.matchups : List[List[Team]]= []
 		self.started : bool = False
 		self.ended : bool = False
-
+		self.stats_showing = [
+								"matches played",
+								"wins",
+								"draws",
+								"losses",
+								"points",
+							]
 		self.matchup_no : int = -1
 		self.results : list = []
+		self.thread = None
 
 
 
 		self.sort_table()
 
 	def copy(self) -> tuple:
-		return self.title, self.teams, self.ties, self.matchups, self.started, self.ended
+		return self.title, self.teams, self.ties, self.matchups, self.started, self.ended, self.stats_showing
 
 	def paste(self, data : tuple) -> None:
-		self.title, self.teams, self.ties, self.matchups, self.started, self.ended = data
+		self.title, self.teams, self.ties, self.matchups, self.started, self.ended, self.stats_showing = data
 
 
 
@@ -76,7 +86,7 @@ class Table:
 
 	def add_team(self, team : Team) -> None:
 		if len(self.teams) >= 99:
-			print("Limit Reached!")
+			OUTPUT("Limit Reached!")
 			return
 		self.teams.append(team)
 		self.results.append([-1, -1])
@@ -109,30 +119,30 @@ class Table:
 
 
 	def load_preset(self) -> bool:
-		print("Searching...")
+		OUTPUT("Searching...")
 		preset_folder = Path("data/table_presets")
 		sleep(.5)
 		# scan for presets
 		available_presets = [folder for folder in preset_folder.iterdir() 
 					if folder.is_dir() and folder.suffix == ".preset"]
 		if not available_presets:
-			print("No presets found!")
+			OUTPUT("No presets found!")
 			sleep(.3)
 			return True
-		print(f"Found {len(available_presets)} preset{"s" if len(available_presets) - 1 else ""}!")
+		OUTPUT(f"Found {len(available_presets)} preset{"s" if len(available_presets) - 1 else ""}!")
 		sleep(.5)
-		print("Select preset:")
+		OUTPUT("Select preset:")
 		sleep(.2)
 		for ind, preset in enumerate(available_presets):
 			preset = preset.with_suffix("")
-			print(f"{ind+1} - {preset.name.replace("-", "/")}")
+			OUTPUT(f"{ind+1} - {preset.name.replace("-", "/")}")
 			sleep(.4)
 		def ask() -> int:
 			choice = input("\n")
 			return (int(choice) if 1 <= int(choice) <= len(available_presets) else ask()) if choice.isdigit() else ask()
 		choice = ask()
 		chosen_preset = available_presets[int(choice) - 1]
-		print(f"Loading {available_presets[int(choice) - 1].with_suffix("")} preset...")
+		OUTPUT(f"Loading {available_presets[int(choice) - 1].with_suffix("")} preset...")
 		sleep(1)
 		
 		parent = Path("data/table_presets/Premier League 26-27.preset")
@@ -146,13 +156,13 @@ class Table:
 		matchups = key.dehex_code().split("\n")
 		new = Table(league_data.pop(0))
 		for data in league_data:
-			new.add_team(Team(*data.split(",")))
+			new.add_team(Team(*data.split(", ")))
 		codes = list(map(Team.get_code, new.teams))
 		for matchup in matchups:
 			new.add_matchup(list(map(lambda team: new.get_teams()[codes.index(team)], matchup.split(","))))
 		sleep(1)
 
-		print("Complete!")
+		OUTPUT("Complete!")
 		sleep(.5)
 
 		self.paste(new.copy())
@@ -169,64 +179,63 @@ class Table:
 		if change == "add":
 			name = input("Name?\n").strip()
 			while (name) in list(map(Team.get_name, self.get_teams())) or not name:
-				print("Already registered! / cannot be empty!")
+				OUTPUT("Already registered! / cannot be empty!")
 				sleep(.2)
 				name = input("Name?\n").strip()
 			sleep(.2)
 			abbr = input("The name that shows up on the table?\n").strip()
 			while abbr in list(map(Team.get_abbr, self.get_teams())) or not abbr:
-				print("Already registered! / cannot be empty!")
+				OUTPUT("Already registered! / cannot be empty!")
 				sleep(.2)
 				abbr = input("The name that shows up on the table?\n").strip()
 			sleep(.2)
-			print(f"Teams: ", end="")
-			print(*list(map(Team.get_code, self.get_teams())), sep=", ")
+			OUTPUT(f"Teams: ", end="")
+			OUTPUT(*list(map(Team.get_code, self.get_teams())), sep=", ")
 			while not (code := input("3-digit code?\n").upper().strip()).isalpha() or len(code) != 3 or code in list(map(Team.get_code, self.get_teams())):
 				pass
 			sleep(.2)
 			self.add_team(Team(name, abbr, code))
-			print("Successfully appended team!")
+			OUTPUT("Successfully appended team!")
 			sleep(.5)
 		elif change == "remove":
 			if not self.get_teams():
-				print("There are no teams yet!")
+				OUTPUT("There are no teams yet!")
 				sleep(.3)
 			else:
 				codes = list(map(lambda x: x.code, self.get_teams()))
-				print(f"Teams: ", end="")
-				print(*codes, sep=", ")
+				OUTPUT(f"Teams: ", end="")
+				OUTPUT(*codes, sep=", ")
 				while (name := input("3-digit code of team to remove:    ").upper()) not in codes:
-					print("not in list!")
+					OUTPUT("not in list!")
 					sleep(.3)
 			self.remove_team(self.get_teams()[codes.index(name)])
 		else:
 			if not self.get_teams():
-				print("There are no teams!")
+				OUTPUT("There are no teams!")
 				sleep(.3)
 				self.team_config()
 
 			if len(self.get_teams()) % 2:
-				print("Number of teams cannot be odd!")
+				OUTPUT("Number of teams cannot be odd!")
 				sleep(.3)
 				self.team_config()
 
 			return
 
 		sleep(.5)
-		print("Teams: ", end="")
-		print(*list(map(Team.get_abbr, self.get_teams())), sep=", ")
+		OUTPUT("Teams: ", end="")
+		OUTPUT(*list(map(Team.get_abbr, self.get_teams())), sep=", ")
 		self.team_config()
 
 
 	def create_matchups(self, auto : bool) -> tuple:
 		pairings = []
+		n = len(self.get_teams())
 		remaining = self.teams[:]
-		n = len(self.teams)
 		opponents = (n-1)
 		home_available = [opponents] * n
 		away_available = [opponents] * n
 		total = n*opponents
-		print(total)
 		for team in self.get_teams():
 			team.max_matches = opponents * n
 
@@ -245,29 +254,37 @@ class Table:
 
 			
 			for i in range(total):
-				print(f"{i}/{total} matches completed")
+				OUTPUT(f"{i}/{total} matches completed")
 				sleep(.1)
-				print(f"teams available for home: {" ".join([codes[ind] for ind in range(n) if home_available[ind]])}")
-				while (home := input("home team? (3-digit code)\n").upper().strip()) not in codes:
-					if home_available[codes.index(home)]:
+				OUTPUT(f"teams available for home: {" ".join([codes[ind] for ind in range(n) if home_available[ind]])}")
+				while True:
+					home = input("home team? (3-digit code)\n").upper().strip()
+					if home not in codes:
+						continue
+					if away_available[codes.index(home)]:
 						break
+					OUTPUT(f"{home} already played all the matches!")
 					sleep(.3)
 				home_index = codes.index(home)
 				home_available[codes.index(home)] -= 1
 				sleep(.2)
 				
-				print(f"teams available for away: {" ".join([codes[ind] for ind in range(n) if away_available[ind] and codes[ind] != home])}")
-				while (away := input("away team? (3-digit code)\n").upper().strip()) not in codes:
+				OUTPUT(f"teams available for away: {" ".join([codes[ind] for ind in range(n) if away_available[ind] and codes[ind] != home])}")
+				while True:
+					away = input("away team? (3-digit code)\n").upper().strip()
+					if away not in codes:
+						continue
 					if away_available[codes.index(away)]:
 						break
+					OUTPUT(f"{away} already played all the matches!")
 					sleep(.3)
 				away_index = codes.index(away)
 				away_available[codes.index(away)] -= 1
 
 				pairings.append((self.teams[home_index], self.teams[away_index]))
 				sleep(.2)
-				input(f"{home} vs {away} add success - continue?\n")
-				print("\n\n\n")
+				input(f"{home} vs {away} add success - enter to continue\n")
+				OUTPUT("\n\n\n")
 			return pairings
 
 
@@ -281,17 +298,17 @@ class Table:
 					self.instantiate()
 
 			case "new":
-				print("Name of league?")
+				OUTPUT("Name of league?")
 				while (league_name := input().strip()) in set(map(lambda f: f.stem, Path("data/in_use").iterdir())):
-					print("Already chosen!")
+					OUTPUT("Already chosen!")
 					sleep(.2)
 				self.title = league_name
 				self.team_config()
 				while (choice := input("Manual or Automatic (does not account stadium) match creation?\n").lower().strip()) not in {"manual", "automatic", "auto"}:
 					sleep(.3)
-					self.matchups = self.create_matchups("auto" in choice)
-					print("Match creation complete!")
-					sleep(.4)
+				self.matchups = self.create_matchups("auto" in choice)
+				OUTPUT("Match creation complete!")
+				sleep(.4)
 
 			case "load":
 				if self.import_save():
@@ -316,14 +333,14 @@ class Table:
 		for team in self.get_teams():
 			team.max_matches = len(self.teams) - 2
 		if self.matchups:
-			print(f"Resumed league data to match no {self.matchup_no+1}")
+			OUTPUT(f"Resumed league data to match no {self.matchup_no+1}")
 			sleep(.3)
-			print("Next match: ", end="")
+			OUTPUT("Next match: ", end="")
 			sleep(.2)
-			print(*self.get_current_matchup(), sep=" vs ")
+			OUTPUT(*self.get_current_matchup(), sep=" vs ")
 		
 		sleep(.3)
-		print("START SEASON!!!")
+		OUTPUT("START SEASON!!!")
 		sleep(1)
 
 	def end_season(self) -> None:
@@ -331,7 +348,7 @@ class Table:
 
 	def sort_table(self) -> None:
 		if self.started:
-			self.teams.sort(key=lambda t: (-t.points, -t.goal_difference, -t.away_goals, t.name))
+			self.teams.sort(key=lambda t: (-t.points, -t.goal_difference, -t.away_goals, -t.matches_played, t.name))
 			return
 		self.teams.sort(key=lambda t: t.abbr)
 		self.ties = [[self.teams[i] for i in range(len(self.teams)-1) if self.teams[i].get_tiebreaker_values() == self.teams[i + 1].get_tiebreaker_values() != -1] for j in range(len(self.teams))]
@@ -346,12 +363,15 @@ class Table:
 			sleep(.3)
 			return
 
-		print("Saving...")
+		OUTPUT("Saving...")
 		sleep(.5)
 		directory = Path("data/in_use") / (self.title.replace(" ", "_") + ".league")
 		directory.mkdir(parents=True, exist_ok=True)
 		with open(directory / "league_data.hex", "w") as league_data_file:
-			if not (t := ",".join([str(" ".join(list(map(str, self.get_teams().index(tie)))) for tie in tie_group) for tie_group in self.ties])):
+			if self.ties:
+				if not (t := ",".join([" ".join([list(map(str, self.get_teams().index(tie))) for tie in tie_group]) for tie_group in self.ties])):
+					t = 0
+			else:
 				t = 0
 			league_data_file.write(Security.enhex(
 				"\n".join(list(map(str, [
@@ -360,6 +380,7 @@ class Table:
 				self.started,
 				self.ended,
 				self.matchup_no,
+				",".join(self.stats_showing),
 				])))))
 
 		with open(directory / "matchups.hex", "w") as matchups_file:
@@ -371,30 +392,30 @@ class Table:
 
 
 		sleep(.8)
-		print("Export complete!")
+		OUTPUT("Export complete!")
 		sleep(1)
 
 
 
 
 	def import_save(self) -> bool:
-		print("Searching...")
+		OUTPUT("Searching...")
 		save_folder = Path("data/in_use")
 
 		# scan for presets
 		available_leagues = [folder for folder in save_folder.iterdir() 
 					if folder.is_dir() and folder.suffix == ".league"]
 		if not available_leagues:
-			print("No leagues found!")
+			OUTPUT("No leagues found!")
 			sleep(.3)
 			return True
 		sleep(.4)
-		print(f"Found {len(available_leagues)} league{"s" if len(available_leagues) - 1 else ""} in use!")
+		OUTPUT(f"Found {len(available_leagues)} league{"s" if len(available_leagues) - 1 else ""} in use!")
 		sleep(.5)
-		print("Select preset:")
+		OUTPUT("Select save file:")
 		sleep(.2)
 		for ind, league in enumerate(available_leagues):
-			print(f"{ind+1} - {league.name.replace("-", "/")}")
+			OUTPUT(f"{ind+1} - {league.name.replace("-", "/")}")
 			sleep(.4)
 
 		def ask() -> int:
@@ -402,7 +423,7 @@ class Table:
 			return (int(choice) if 1 <= int(choice) <= len(available_leagues) else ask()) if choice.isdigit() else ask()
 		choice = ask()
 		chosen_preset = available_leagues[int(choice) - 1]
-		print(f"Loading {chosen_preset.with_suffix(".league")} preset...")
+		OUTPUT(f"Loading {chosen_preset.with_suffix(".league")} save file...")
 		sleep(1)
 		
 
@@ -445,6 +466,7 @@ class Table:
 		new.started = league_data[2] == "True"
 		new.ended = league_data[3] == "True"
 		new.matchup_no = int(league_data[4])
+		new.stats_showing = league_data[5].split(",")
  
 
 
@@ -460,7 +482,7 @@ class Table:
 
 		sleep(1)
 
-		print("Complete!")
+		OUTPUT("Complete!")
 		sleep(.5)
 
 		self.paste(new.copy())
@@ -474,7 +496,6 @@ class Table:
 		team1.add_scoreline(int(res1), int(res2), home=True)
 		team2.add_scoreline(int(res2), int(res1), home=False)
 
-		self.increment_match_count()
 		self.submit_scoreline((team1, team2), (res1, res2))
 
 
@@ -484,24 +505,64 @@ class Table:
 			sleep(.2)
 
 		while not (delay := input("miliseconds of delay for each display?\n").strip()).isdigit():
-			print("whole number!")
+			OUTPUT("whole number!")
 			sleep(.3)
 		sleep(.3)
-		print("(enter to skip)")
+		OUTPUT("(enter to skip)")
 		sleep(.5)
 
 		
 		self.await_inp()
 		for ind, matchup in enumerate(self.matchups):
 			matchup = list(map(Team.get_name if ask == "name" else Team.get_code, matchup))
-			print(f"{ind+1} - ", end="")
-			print(*matchup, sep=" vs ")
+			OUTPUT(f"{ind+1} - ", end="")
+			OUTPUT(*matchup, sep=" vs ")
 			if self.skipped:
 				sleep(int(delay) / 1000)
+		if self.skipped or not int(delay):
+			OUTPUT("(click enter twice)")
+			input()
 
+	def config_table(self) -> None:
+		sleep(.3)
+		OUTPUT(f"Statistics showing: {", ".join(self.stats_showing)}")
+		sleep(.3)
+		while True:
+			choice = input("add, remove or exit? ")
+			if choice not in {"add", "remove", "exit"}:
+				continue
+			func = callable
+			match choice:
+				case "add":
+					while (after := input(f"after which stat? ")) not in self.stats_showing:
+						OUTPUT("stat not found!")
+						sleep(.3)
+					index = self.stats_showing.index(after) + 1
+				case "remove":
+					func = "remove"
+				case "exit":
+					break
+			sleep(.5)
+			OUTPUT("Here are the existing stats: ")
+			OUTPUT(*(self.stats_showing if func == "remove" else self.existing_stats), sep="\n")
+			while True:
+				stat = input("which stat? ").strip().lower()
+				if stat not in (self.stats_showing if func == "remove" else self.existing_stats):
+					OUTPUT("stat not found!")
+					continue
+				elif stat in self.stats_showing and func != "remove":
+					OUTPUT("stat already set!")
+					continue
+				sleep(.3)
+				break
+			if func == "remove":
+				self.stats_showing.remove(stat)
+			else:
+				self.stats_showing.insert(int(index), stat)
+			OUTPUT("success!")
+			sleep(.5)
 
 	def __str__(self) -> str:
-
 		self.sort_table()
 		total_width : int = sum(
 						[
@@ -531,7 +592,7 @@ class Table:
 
 		identifiers : list = ["| R |"]
 		
-		longest_name = len(max(self.teams, key=lambda x: len(x.abbr)).abbr) + 1
+		longest_name = max(len(max(self.teams, key=lambda x: len(x.abbr)).abbr) + 1, 4)
 		identifiers.append(" " * (longest_name // 2 - 2) + "Name" + " " * (longest_name // 2 - 2) + "|")
 		for stat in self.stats_showing:
 			key, trailings = self.existing_stats[stat]
@@ -618,16 +679,12 @@ class Team:
 
 	def add_scoreline(self, scored : int, conceded : int, *, home : bool) -> None:
 		if self.matches_played >= self.max_matches:
-			print("Already played all the matches!")
-			sleep(.5)
+			# OUTPUT(f"Already played all the matches! - {self.name} played {self.matches_played} expected {self.max_matches}")
+			# sleep(.5)
 			return
 
 		state = "lose" if scored < conceded else ("win" if scored > conceded else ("null" if scored == conceded == -1 else "draw"))
-		if home:
-			self.home_goals += scored
-		else:
-			self.away_goals += scored
-		
+
 		match state:
 			case "win":
 				self.wins += 1
@@ -636,7 +693,14 @@ class Team:
 			case "lose":
 				self.losses += 1
 			case "null":
-				pass
+				return
+
+		if home:
+			self.home_goals += scored
+		else:
+			self.away_goals += scored
+		self.goals_conceded += conceded
+		
 
 		self.recalibrate()
 		return
@@ -692,6 +756,7 @@ class Team:
 		self.goals_scored  = int(data[11])
 		self.goals_conceded = int(data[12])
 		self.goal_difference = int(data[13])
+		self.recalibrate()
 
 	def __eq__(self, other) -> bool:
 		return self.name == other.name
@@ -730,13 +795,16 @@ class Security:
 	def enhex(code : str) -> str:
 		if type(code) != str:
 			raise TypeError
-			print("parse error!", file=sys.stderr)
+			OUTPUT("parse error!", file=sys.stderr)
 		return "\n".join(["{:04x}".format(ord(char)) for char in str(code)])
 
 	@staticmethod
-	def dehex(code : str) -> str:
-		return "".join([chr(int(num, 16)) for num in code.split("\n")])
-
+	def dehex(code : str) -> str | bool:
+		try:
+			return "".join([chr(int(num, 16)) for num in code.split("\n")])
+		except ValueError:
+			CorruptedFile("Decoding error! Most likely because of corrupted file, because of a parsing error in the past.")
+			return True
 
 	def enhex_code(self) -> str:
 		return "\n".join(["{:04x}".format(ord(char)) for char in self.code])
@@ -748,4 +816,4 @@ class Security:
 # key = Security()
 # f = Path("data/table_presets/Premier League 26-27.preset/league_data.hex")
 # f.write_text(key.enhex(f.read_text()))
-# print(Security.enhex("Premier_League"))
+# OUTPUT(Security.enhex("Premier_League"))
