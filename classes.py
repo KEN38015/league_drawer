@@ -348,7 +348,7 @@ class Table:
 
 	def sort_table(self) -> None:
 		if self.started:
-			self.teams.sort(key=lambda t: (-t.points, -t.goal_difference, -t.away_goals, -t.matches_played, t.name))
+			self.teams.sort(key=lambda t: (-t.points, -t.goal_difference, -t.away_goals, -t.matches_played, t.abbr))
 			return
 		self.teams.sort(key=lambda t: t.abbr)
 		self.ties = [[self.teams[i] for i in range(len(self.teams)-1) if self.teams[i].get_tiebreaker_values() == self.teams[i + 1].get_tiebreaker_values() != -1] for j in range(len(self.teams))]
@@ -461,8 +461,10 @@ class Table:
 			team.load(data)
 			new.add_team(team)
 			
-		if league_data[1]:
+		if int(league_data[1]):
 			new.ties = [[new.get_teams()[int(tie)] for tie in tie_set.split()] for tie_set in league_data[1].split(",")]
+		else:
+			new.ties = []
 		new.started = league_data[2] == "True"
 		new.ended = league_data[3] == "True"
 		new.matchup_no = int(league_data[4])
@@ -486,6 +488,7 @@ class Table:
 		sleep(.5)
 
 		self.paste(new.copy())
+		self.sort_table()
 		return False
 
 	
