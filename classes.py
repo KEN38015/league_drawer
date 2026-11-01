@@ -69,10 +69,10 @@ class Table:
 		self.sort_table()
 
 	def copy(self) -> tuple:
-		return self.title, self.teams, self.ties, self.matchups, self.started, self.ended, self.stats_showing
+		return self.title, self.teams, self.ties, self.matchups, self.started, self.ended, self.matchup_no, self.stats_showing
 
 	def paste(self, data : tuple) -> None:
-		self.title, self.teams, self.ties, self.matchups, self.started, self.ended, self.stats_showing = data
+		self.title, self.teams, self.ties, self.matchups, self.started, self.ended, self.matchup_no, self.stats_showing = data
 
 
 
@@ -309,7 +309,7 @@ class Table:
 				self.matchups = self.create_matchups("auto" in choice)
 				OUTPUT("Match creation complete!")
 				sleep(.4)
-
+				self.save()
 			case "load":
 				if self.import_save():
 					self.instantiate()
@@ -344,7 +344,7 @@ class Table:
 		sleep(1)
 
 	def end_season(self) -> None:
-		pass
+		self.ended = True
 
 	def sort_table(self) -> None:
 		if self.started:
@@ -483,7 +483,6 @@ class Table:
 
 
 		sleep(1)
-
 		OUTPUT("Complete!")
 		sleep(.5)
 
@@ -596,7 +595,7 @@ class Table:
 		identifiers : list = ["| R |"]
 		
 		longest_name = max(len(max(self.teams, key=lambda x: len(x.abbr)).abbr) + 1, 4)
-		identifiers.append(" " * (longest_name // 2 - 2) + "Name" + " " * (longest_name // 2 - 2) + "|")
+		identifiers.append(" " * (longest_name // 2 - (2 if longest_name > 5 else 1)) + "Name" + " " * (longest_name // 2 - 2) + "|")
 		for stat in self.stats_showing:
 			key, trailings = self.existing_stats[stat]
 			identifiers.append(" " * trailings + key + " " * trailings + "|")

@@ -100,10 +100,11 @@ def delete(league : Table) -> None:
 	OUTPUT("deleting", end=".")
 	for _ in range(5):
 		OUTPUT(".", end="")
-	directory = Path("data/in_use") / (self.title.replace(" ", "_") + ".league")
+	directory = Path("data/in_use") / (league.title.replace(" ", "_") + ".league")
 	for child in directory.iterdir():
 		child.unlink()
 	directory.rmdir()
+	sleep(2)
 	OUTPUT(f"Deleted file {directory.name}, exitting to main menu")
 	sleep(1)
 
@@ -118,7 +119,7 @@ def main() -> None:
 	league.start_season()
 
 
-	while not league.ended:
+	while True:
 		options = ["display", "config", "submit", "history", "fixtures", "save", "delete", "exit"]
 		prompts = [
 			"show table", 
@@ -131,6 +132,11 @@ def main() -> None:
 			"exit",
 		]
 		OUTPUT("What do you wish to do?")
+
+		if league.ended:
+			options.remove("submit")
+
+
 		sleep(.2)
 		for prompt, option in zip(prompts, options):
 			OUTPUT(f"\t({option}) {prompt.capitalize()}")
@@ -176,8 +182,13 @@ def main() -> None:
 
 		sleep(.5)
 	else:
-		pass
-		# league ended type shit
+		league.end_season()
+		OUTPUT("ALL MATCHES PLAYED")
+		sleep(1)
+		OUTPUT("saving...")
+		OUTPUT("THE FINAL TABLE:")
+		sleep(.5)
+		print(league)
 
 
 		
